@@ -29,7 +29,7 @@ func Migrate() {
 	// Create new migration instance
 	m, err := migrate.NewWithDatabaseInstance(
 		"file://migrate/migrations",
-		"cdmmf",
+		"nuwc",
 		driver,
 	)
 	if err != nil {
@@ -37,7 +37,7 @@ func Migrate() {
 	}
 
 	// Migrate all the way up ...
-	if err := m.Up(); err != nil {
-		log.Fatal(err)
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		log.Fatalf("An error occurred while syncing the database.. %v", err)
 	}
 }

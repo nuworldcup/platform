@@ -1,4 +1,4 @@
-module github.com/rojaswestall/festivalPlatform
+module github.com/rojaswestall/platform
 
 go 1.13
 

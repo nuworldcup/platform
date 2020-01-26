@@ -150,7 +150,7 @@ func main() {
 	migrate.Migrate()
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/", homeLink)
-	router.HandleFunc("/serveWs", purchaseTickets)
+	router.HandleFunc("/serveWs", serveWs)
 	//add any new endpoints here
 	fmt.Println("The server is listening at http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", router))

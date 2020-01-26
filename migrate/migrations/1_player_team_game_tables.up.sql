@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS team_player(
    player_id int REFERENCES player (player_id) ON UPDATE CASCADE ON DELETE CASCADE,
    captain boolean NOT NULL DEFAULT false,
    CONSTRAINT team_player_key PRIMARY KEY (team_id, player_id) -- explicit pk
-)
+);
 
 CREATE INDEX idx_team_player_team_id ON team_player(team_id);
 -- still might want to create an index for searching for player_id
