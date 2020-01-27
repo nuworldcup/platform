@@ -34,7 +34,7 @@ psql nuwc -c "\d player"
 
 For basic `psql` commands visit this [cheatsheet](https://jazstudios.blogspot.com/2010/06/postgresql-login-commands.html)
 
-#### Making db changes
+#### Making structural db changes
 
 If you're adding a table, index, adding a column or whatever it is, add another migration file. Make sure you put the sequential number in front of it, and add both a migrate up and migrate down. If you need help understanding migrations, it might be a good idea to look at the [golang-migrate docs](https://github.com/golang-migrate/migrate).
 
@@ -53,3 +53,6 @@ Navigate to the root directory and start the server:
 ```
 go run server.go
 ```
+
+client_id: 73602625842-90o4imagq357eonpj7glq5gjleqedqcp.apps.googleusercontent.com
+client_secret: zIrenAJxlSlVK9LVpbJVOeLw
