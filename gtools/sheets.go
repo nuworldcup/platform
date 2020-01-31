@@ -91,38 +91,39 @@ func getService() *sheets.Service {
 // given sheetId, and name of Team, create add sheet to a spreadsheet
 func AddSheet(spreadsheetId string, name string) error {
 	srv := getService()
-	// create request to add new sheet
-	// this is ugly but google api wants all pointers
-	// there may be a better way to do this
-	property := sheets.SheetProperties{
-		Title: name,
-	}
-	addSheet := sheets.AddSheetRequest{
-		Properties: &property,
-	}
-	request := sheets.Request{
-		AddSheet: &addSheet,
+	request := &sheets.Request{
+		AddSheet: &sheets.AddSheetRequest{
+			Properties: &sheets.SheetProperties{
+				Title: name,
+			},
+		},
 	}
 	batchUpdateRequest := sheets.BatchUpdateSpreadsheetRequest{
-		Requests: []*sheets.Request{&request},
+		Requests: []*sheets.Request{request},
 	}
 	_, err := srv.Spreadsheets.BatchUpdate(spreadsheetId, &batchUpdateRequest).Do()
 	// the _ is the response which takes this form https://godoc.org/google.golang.org/api/sheets/v4#BatchUpdateSpreadsheetResponse
 	return err
 }
 
-// given sheet, spreadsheet, and slice of strings, add to sheet
-func AddRow(spreadsheetId string) error {
-	// Below is an example of adding values as cells
+// given sheet, spreadsheetId, and slice of strings, add to sheet
+func AddSheetRow(sheetName string, spreadsheetId string, values []string) error {
 	srv := getService()
-	writeRange := "Fuckin Tav"
+	// wrap name in single quotes to account for spaces
+	writeRange := "'" + sheetName + "'"
 
 	var vr sheets.ValueRange
 
-	myval := []interface{}{"One", "Two", "Three"}
-	vr.Values = append(vr.Values, myval)
+	newRow := make([]interface{}, len(values))
+	for i, v := range values {
+		newRow[i] = v
+	}
+	vr.Values = append(vr.Values, newRow)
 
-	_, err := srv.Spreadsheets.Values.Update(spreadsheetId, writeRange, &vr).ValueInputOption("RAW").Do()
+	valueInputOption := "RAW"
+	insertDataOption := "INSERT_ROWS"
+
+	_, err := srv.Spreadsheets.Values.Append(spreadsheetId, writeRange, &vr).ValueInputOption(valueInputOption).InsertDataOption(insertDataOption).Do()
 	// if err != nil {
 	// 	log.Fatalf("Unable to retrieve data from sheet. %v", err)
 	// }

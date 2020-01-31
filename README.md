@@ -34,7 +34,19 @@ psql nuwc -c "\d player"
 
 For basic `psql` commands visit this [cheatsheet](https://jazstudios.blogspot.com/2010/06/postgresql-login-commands.html)
 
-#### Making structural db changes
+#### Google Sheets setup
+
+For the app to be able update a spreadsheet you need to add your spreadsheet ID in `server.go`. Do not push `token.go` to github as it contains a token only acquired after authorization from a google account. If you want to use google sheets functionality locally, you'll need to manually authenticate on a browser the first time you use one of the available functions in `sheets.go`. Follow the instructions on the command line and in the browser and a `token.json` file will be added to `gtools/` and all api calls from that point forward will use the `token.json` file to authenticate.
+
+## Run the server
+
+Navigate to the root directory and start the server:
+
+```
+go run server.go
+```
+
+## Making structural db changes
 
 If you're adding a table, index, adding a column or whatever it is, add another migration file. Make sure you put the sequential number in front of it, and add both a migrate up and migrate down. If you need help understanding migrations, it might be a good idea to look at the [golang-migrate docs](https://github.com/golang-migrate/migrate).
 
@@ -45,11 +57,3 @@ brew install golang-migrate
 ```
 
 If you want to work with a database version that doesn't include the latest version of migrations, comment out `migrate.Migrate()` in `main()` of `server.go()`, then use the go-lang CLI to migrate to whatever verison you want to use and restart the application. Optionally, you could alter `migrate.go`, but don't push those changes.
-
-## Run the server
-
-Navigate to the root directory and start the server:
-
-```
-go run server.go
-```

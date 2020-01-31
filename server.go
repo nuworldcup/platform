@@ -150,12 +150,13 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 }
 
 type RegistrationInfo struct {
-	TeamName string `json:"team_name"`
+	TeamName string   `json:"team_name"`
+	Players  []string `json:"players"`
 }
 
 func handleRegister(w http.ResponseWriter, r *http.Request) {
 	// TODO:: Use AWS secrets to set spreadsheetId for sheets
-	spreadsheetId := ""
+	spreadsheetId := "1jDCdULFKmxmgCsJTJgqzKloCvnE85r8PyLvXDAlKLcA"
 	// TODO:: Use AWS secrets to get credentials/token
 
 	var info RegistrationInfo
@@ -168,7 +169,15 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Create new sheet
 	err = gtools.AddSheet(spreadsheetId, info.TeamName)
+	// Add logic to handle name already exists
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// add values to the new sheet
+	err = gtools.AddSheetRow(info.TeamName, spreadsheetId, info.Players)
 	if err != nil {
 		log.Fatal(err)
 	}
