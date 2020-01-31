@@ -1,10 +1,13 @@
 package main
 
 import (
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 
+	"github.com/rojaswestall/platform/gtools"
 	"github.com/rojaswestall/platform/migrate"
 
 	"github.com/gorilla/mux"
@@ -146,12 +149,54 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 	reader(ws)
 }
 
+type RegistrationInfo struct {
+	TeamName string `json:"team_name"`
+}
+
+func handleRegister(w http.ResponseWriter, r *http.Request) {
+	// TODO:: Use AWS secrets to set spreadsheetId for sheets
+	spreadsheetId := ""
+	// TODO:: Use AWS secrets to get credentials/token
+
+	var info RegistrationInfo
+
+	// Try to decode the request body into the struct. If there is an error,
+	// respond to the client with the error message and a 400 status code.
+	err := json.NewDecoder(r.Body).Decode(&info)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = gtools.AddSheet(spreadsheetId, info.TeamName)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// respond back to the client that the team was registered
+	fmt.Fprintf(w, "Team Info: %+v", info)
+	fmt.Println("register endpoint was hit")
+}
+
 func main() {
-	migrate.Migrate()
+	// create db instance
+	// TODO:: Use AWS secrets to get username and password
+	db, err := sql.Open("postgres", "postgres://nuwcuser:password@localhost:5432/nuwc?sslmode=disable")
+	// Want sslmode to be enable as some point, for now disable
+	if err != nil {
+		log.Fatal(err)
+	}
+	// migrate
+	migrate.Migrate(db)
+
+	// Create router
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/", homeLink)
 	router.HandleFunc("/serveWs", serveWs)
+	router.HandleFunc("/register", handleRegister).Methods("POST")
 	//add any new endpoints here
+
+	// Start listening
 	fmt.Println("The server is listening at http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", router))
 }

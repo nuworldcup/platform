@@ -12,13 +12,7 @@ import (
 )
 
 // https://godoc.org/github.com/golang-migrate/migrate#example-NewWithDatabaseInstance
-func Migrate() {
-	// Create and use existing db instance
-	db, err := sql.Open("postgres", "postgres://nuwcuser:password@localhost:5432/nuwc?sslmode=disable")
-	// Want sslmode to be enable as some point, for now disable
-	if err != nil {
-		log.Fatal(err)
-	}
+func Migrate(db *sql.DB) {
 
 	// Create postgres specific driver instance
 	driver, err := postgres.WithInstance(db, &postgres.Config{})

@@ -1,4 +1,4 @@
-package main
+package gtools
 
 import (
 	"encoding/json"
@@ -69,40 +69,62 @@ func saveToken(path string, token *oauth2.Token) {
 	json.NewEncoder(f).Encode(token)
 }
 
-func main() {
+func getService() *sheets.Service {
 	b, err := ioutil.ReadFile("gtools/credentials.json")
 	if err != nil {
 		log.Fatalf("Unable to read client secret file: %v", err)
 	}
 
-	// If modifying these scopes, delete your previously saved token.json.
-	config, err := google.ConfigFromJSON(b, "https://www.googleapis.com/auth/spreadsheets.readonly")
+	// if changing this line, delete token.json / reset in AWS secrets
+	config, err := google.ConfigFromJSON(b, "https://www.googleapis.com/auth/spreadsheets")
 	if err != nil {
 		log.Fatalf("Unable to parse client secret file to config: %v", err)
 	}
 	client := getClient(config)
-
 	srv, err := sheets.New(client)
 	if err != nil {
-		log.Fatalf("Unable to retrieve Sheets client: %v", err)
+		log.Fatalf("Unable to retrieve Sheets Client %v", err)
 	}
+	return srv
+}
 
-	// Prints the names and majors of students in a sample spreadsheet:
-	// https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit
-	spreadsheetId := "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
-	readRange := "Class Data!A2:E"
-	resp, err := srv.Spreadsheets.Values.Get(spreadsheetId, readRange).Do()
-	if err != nil {
-		log.Fatalf("Unable to retrieve data from sheet: %v", err)
+// given sheetId, and name of Team, create add sheet to a spreadsheet
+func AddSheet(spreadsheetId string, name string) error {
+	srv := getService()
+	// create request to add new sheet
+	// this is ugly but google api wants all pointers
+	// there may be a better way to do this
+	property := sheets.SheetProperties{
+		Title: name,
 	}
+	addSheet := sheets.AddSheetRequest{
+		Properties: &property,
+	}
+	request := sheets.Request{
+		AddSheet: &addSheet,
+	}
+	batchUpdateRequest := sheets.BatchUpdateSpreadsheetRequest{
+		Requests: []*sheets.Request{&request},
+	}
+	_, err := srv.Spreadsheets.BatchUpdate(spreadsheetId, &batchUpdateRequest).Do()
+	// the _ is the response which takes this form https://godoc.org/google.golang.org/api/sheets/v4#BatchUpdateSpreadsheetResponse
+	return err
+}
 
-	if len(resp.Values) == 0 {
-		fmt.Println("No data found.")
-	} else {
-		fmt.Println("Name, Major:")
-		for _, row := range resp.Values {
-			// Print columns A and E, which correspond to indices 0 and 4.
-			fmt.Printf("%s, %s\n", row[0], row[4])
-		}
-	}
+// given sheet, spreadsheet, and slice of strings, add to sheet
+func AddRow(spreadsheetId string) error {
+	// Below is an example of adding values as cells
+	srv := getService()
+	writeRange := "Fuckin Tav"
+
+	var vr sheets.ValueRange
+
+	myval := []interface{}{"One", "Two", "Three"}
+	vr.Values = append(vr.Values, myval)
+
+	_, err := srv.Spreadsheets.Values.Update(spreadsheetId, writeRange, &vr).ValueInputOption("RAW").Do()
+	// if err != nil {
+	// 	log.Fatalf("Unable to retrieve data from sheet. %v", err)
+	// }
+	return err
 }
