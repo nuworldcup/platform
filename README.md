@@ -53,6 +53,3 @@ Navigate to the root directory and start the server:
 ```
 go run server.go
 ```
-
-client_id: 73602625842-90o4imagq357eonpj7glq5gjleqedqcp.apps.googleusercontent.com
-client_secret: zIrenAJxlSlVK9LVpbJVOeLw
