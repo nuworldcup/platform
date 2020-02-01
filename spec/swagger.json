@@ -25,90 +25,30 @@
   } ],
   "paths" : {
     "/register" : {
-      "get" : {
-        "tags" : [ "developers" ],
-        "summary" : "searches inventory",
-        "description" : "By passing in the appropriate options, you can search for\navailable inventory in the system\n",
-        "operationId" : "searchInventory",
-        "parameters" : [ {
-          "name" : "searchString",
-          "in" : "query",
-          "description" : "pass an optional search string for looking up inventory",
-          "required" : false,
-          "style" : "form",
-          "explode" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "name" : "skip",
-          "in" : "query",
-          "description" : "number of records to skip for pagination",
-          "required" : false,
-          "style" : "form",
-          "explode" : true,
-          "schema" : {
-            "minimum" : 0,
-            "type" : "integer",
-            "format" : "int32"
-          }
-        }, {
-          "name" : "limit",
-          "in" : "query",
-          "description" : "maximum number of records to return",
-          "required" : false,
-          "style" : "form",
-          "explode" : true,
-          "schema" : {
-            "maximum" : 50.0,
-            "minimum" : 0,
-            "type" : "integer",
-            "format" : "int32"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "search results matching criteria",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "type" : "array",
-                  "items" : {
-                    "$ref" : "#/components/schemas/InventoryItem"
-                  }
-                }
-              }
-            }
-          },
-          "400" : {
-            "description" : "bad input parameter"
-          }
-        }
-      },
       "post" : {
-        "tags" : [ "admins" ],
-        "summary" : "adds an inventory item",
-        "description" : "Adds an item to the system",
-        "operationId" : "addInventory",
+        "tags" : [ "developers" ],
+        "summary" : "registers user(s) for a tournament",
+        "description" : "Adds all players and captains to the db and google sheets. If `registration_type` is `team`, platform will create an entire team in the db and on google sheets. For `team` registration, the system will try to create a new sheet in order of the the `name_preferences` and if all are taken by other teams will assign a default. For `individual` registration, simply omit the `name_preferences` and `captains` fields, and include a `players` array of just one player.",
+        "operationId" : "register",
         "requestBody" : {
           "description" : "Inventory item to add",
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/InventoryItem"
+                "$ref" : "#/components/schemas/RegistrationInfo"
               }
             }
           }
         },
         "responses" : {
           "201" : {
-            "description" : "item created"
+            "description" : "registration request created"
           },
           "400" : {
             "description" : "invalid input, object invalid"
           },
-          "409" : {
-            "description" : "an existing item already exists"
+          "500" : {
+            "description" : "internal server error"
           }
         }
       }
@@ -120,11 +60,6 @@
         "required" : [ "club", "email", "firstName", "lastName" ],
         "type" : "object",
         "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid",
-            "example" : "d290f1ee-6c54-4b01-90e6-d701748f0851"
-          },
           "firstName" : {
             "type" : "string",
             "example" : "Angel"
@@ -134,49 +69,71 @@
             "example" : "Croce"
           },
           "email" : {
+            "type" : "string",
+            "example" : "angelcroce2021@u.northwestern.edu"
+          },
+          "club" : {
             "type" : "boolean",
             "example" : false
           }
         }
       },
-      "InventoryItem" : {
-        "required" : [ "id", "manufacturer", "name", "releaseDate" ],
+      "Captain" : {
+        "required" : [ "club", "email", "firstName", "lastName", "phone" ],
         "type" : "object",
         "properties" : {
-          "id" : {
+          "firstName" : {
             "type" : "string",
-            "format" : "uuid",
-            "example" : "d290f1ee-6c54-4b01-90e6-d701748f0851"
+            "example" : "Angel"
           },
-          "name" : {
+          "lastName" : {
             "type" : "string",
-            "example" : "Widget Adapter"
+            "example" : "Croce"
           },
-          "releaseDate" : {
+          "email" : {
             "type" : "string",
-            "format" : "date-time"
-          },
-          "manufacturer" : {
-            "$ref" : "#/components/schemas/Manufacturer"
-          }
-        }
-      },
-      "Manufacturer" : {
-        "required" : [ "name" ],
-        "type" : "object",
-        "properties" : {
-          "name" : {
-            "type" : "string",
-            "example" : "ACME Corporation"
-          },
-          "homePage" : {
-            "type" : "string",
-            "format" : "url",
-            "example" : "https://www.acme-corp.com"
+            "example" : "angelcroce2021@u.northwestern.edu"
           },
           "phone" : {
             "type" : "string",
-            "example" : "408-867-5309"
+            "example" : "1234567890"
+          },
+          "club" : {
+            "type" : "boolean",
+            "example" : false
+          }
+        }
+      },
+      "RegistrationInfo" : {
+        "required" : [ "captains", "name_preferences", "players", "registration_type", "tournament_type" ],
+        "type" : "object",
+        "properties" : {
+          "registration_type" : {
+            "type" : "string",
+            "enum" : [ "team", "individual" ]
+          },
+          "tournament_type" : {
+            "type" : "string",
+            "enum" : [ "coed", "womens" ]
+          },
+          "name_preferences" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "example" : "Colombia, Italy, Brazil"
+            }
+          },
+          "captains" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Captain"
+            }
+          },
+          "players" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Player"
+            }
           }
         }
       }
