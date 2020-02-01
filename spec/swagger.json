@@ -24,7 +24,7 @@
     "description" : "Operations available to regular developers"
   } ],
   "paths" : {
-    "/inventory" : {
+    "/register" : {
       "get" : {
         "tags" : [ "developers" ],
         "summary" : "searches inventory",
@@ -116,6 +116,29 @@
   },
   "components" : {
     "schemas" : {
+      "Player" : {
+        "required" : [ "club", "email", "firstName", "lastName" ],
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid",
+            "example" : "d290f1ee-6c54-4b01-90e6-d701748f0851"
+          },
+          "firstName" : {
+            "type" : "string",
+            "example" : "Angel"
+          },
+          "lastName" : {
+            "type" : "string",
+            "example" : "Croce"
+          },
+          "email" : {
+            "type" : "boolean",
+            "example" : false
+          }
+        }
+      },
       "InventoryItem" : {
         "required" : [ "id", "manufacturer", "name", "releaseDate" ],
         "type" : "object",
