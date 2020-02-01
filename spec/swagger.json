@@ -10,16 +10,13 @@
       "name" : "Apache 2.0",
       "url" : "http://www.apache.org/licenses/LICENSE-2.0.html"
     },
-    "version" : "1.0.0"
+    "version" : "1.0.2"
   },
   "servers" : [ {
-    "url" : "https://virtserver.swaggerhub.com/nuworldcup/platform/1.0.0",
+    "url" : "https://virtserver.swaggerhub.com/nuworldcup/platform/1.0.2",
     "description" : "SwaggerHub API Auto Mocking"
   } ],
   "tags" : [ {
-    "name" : "admins",
-    "description" : "Secured Admin-only calls"
-  }, {
     "name" : "developers",
     "description" : "Operations available to regular developers"
   } ],
