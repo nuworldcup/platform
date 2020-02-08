@@ -1,102 +1,30 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
-	"github.com/rojaswestall/platform/gtools"
+	"github.com/rojaswestall/platform/dblib"
 	"github.com/rojaswestall/platform/migrate"
+	"github.com/rojaswestall/platform/types"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 )
 
+// Want to add secrets to this too
+type NUWCData struct {
+	db *dblib.DB
+	// slack key
+	// spreadsheet id
+	// sheets token
+}
+
 func homeLink(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Welcome home : )")
-}
-
-// Add omit empty so unmarshalling json won't require that we have things like
-// id or phone number
-
-type Person struct {
-	Id          string `json:"id"`
-	FirstName   string `json:"firstName"`
-	LastName    string `json:"lastName"`
-	Email       string `json:"email"`
-	PhoneNumber string `json:"number"`
-}
-
-type Ref struct {
-	Person
-}
-
-type Player struct {
-	Person
-}
-
-type Coach struct {
-	Person
-}
-
-type Team struct {
-	Id       string   `json:"id"`
-	Captains []Player `json:"captains"`
-	Players  []Player `json:"players"` // have this be a list of ids
-	Name     string   `json:"name"`
-	Wins     int      `json:"wins"`
-	Losses   int      `json:"losses"`
-	Draws    int      `json:"draws:"`
-	Icon     string   `json:"icon"` // url of icon or flag to represent team
-}
-
-type GameState int
-
-const (
-	unknown GameState = iota
-	FirstHalf
-	SecondHalf
-	NotStarted
-	HalfTime
-	ExtraTime
-	OverTime
-	Complete
-	sentinel
-)
-
-func (s GameState) isValid() bool {
-	return s > unknown && s < sentinel
-}
-
-// to get the string representations of the gameState
-func (s GameState) String() string {
-	states := [...]string{
-		"First Half",
-		"Second Half",
-		"Not Started",
-		"Half Time",
-		"Extra Time",
-		"Overtime",
-		"Complete"}
-	if !s.isValid() {
-		return "Unknown"
-	}
-	return states[s]
-}
-
-type Game struct {
-	Id            string `json:"id"`
-	HomeTeam      Team
-	AwayTeam      Team
-	HomeTeamScore string
-	AwayTeamScore string
-	Date          string
-	Time          string
-	Venue         string
-	GameState     GameState // could be something like first half, second half, overtime ...
-	// Refs          []string  // ids of the refs
 }
 
 // We'll need to define an Upgrader
@@ -150,14 +78,24 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 }
 
 type RegistrationInfo struct {
-	TeamName string   `json:"team_name"`
-	Players  []string `json:"players"`
+	RegistrationType types.RegistrationType `json:"registration_type"`          // cannot be empty
+	TournamentType   types.TournamentType   `json:"tournament_type"`            // cannot be empty
+	NamePreferences  []string               `json:"name_preferences,omitempty"` // can have as many preferences as they want
+	Captains         []types.Captain        `json:"captains,omitempty"`         // can have as many captains as they want
+	Players          []types.Player         `json:"players"`                    // cannot be empty
 }
 
-func handleRegister(w http.ResponseWriter, r *http.Request) {
+// Creat a map from country name to 3 digit code that tells us what flag to use OR keep that on the front end
+
+func (nuwc *NUWCData) registerHandler(w http.ResponseWriter, r *http.Request) {
 	// TODO:: Use AWS secrets to set spreadsheetId for sheets
-	spreadsheetId := "1jDCdULFKmxmgCsJTJgqzKloCvnE85r8PyLvXDAlKLcA"
-	// TODO:: Use AWS secrets to get credentials/token
+	// spreadsheetId := "1jDCdULFKmxmgCsJTJgqzKloCvnE85r8PyLvXDAlKLcA"
+	// TODO:: Use AWS secrets to get credentials/token in gtools lib
+
+	// Add everything to our db and then start the google sheets stuffs,
+	// if there is a google sheets error don't return error to the client
+	// Only return error to client if we get errors adding to the db
+	// We can always get the data from the db
 
 	var info RegistrationInfo
 
@@ -169,40 +107,158 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	///////////////////////////////////////////////////
+	///////////// VALIDATE REQUEST FORMAT /////////////
+	///////////////////////////////////////////////////
+
+	// check for at least one captain
+	// check for 8 players
+	// check for 3 name preferences
+	// check for reg type
+	// check for tournament type
+	// validate that it's after the time to register
+
+	////////////////////////////////////////////////////
+	//////////////////// DB UPDATES ////////////////////
+	////////////////////////////////////////////////////
+
+	var sheetName string
+	var insertId int64
+	// var teamId string
+
+	// add the team with unique team name
+	for i := 0; i <= len(info.NamePreferences); i++ {
+
+		// all the preferences have already been tried
+		if i == len(info.NamePreferences) {
+			// at this point we could also return a response to the client that all the names have already been taken
+			added := true
+			count := 1
+			// try default names until it works
+			for added {
+				res, err := nuwc.db.CreateTeamIfNotExists(&types.Team{Tournament: info.TournamentType, Name: "Team " + strconv.Itoa(count)})
+				if err != nil {
+					// insert failed: something wrong with the db, tell the client we're messed UP
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
+				// Check that there was actually an update for the team
+				if num, err := res.RowsAffected(); err != nil {
+					// weird issue getting the number of rows affected: something wrong with the db, tell the client we're messed UP
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				} else if num == 0 {
+					count++
+					continue
+				}
+				// success
+				insertId, err = res.LastInsertId()
+				sheetName = "Team " + strconv.Itoa(count)
+				added = false
+			}
+			break
+		}
+
+		// check the db to see if the name already exists
+		exists, err := nuwc.db.TeamExists(info.NamePreferences[i])
+		fmt.Println("Team "+info.NamePreferences[i]+" -- exists: %t", exists)
+		if err != nil {
+			// something wrong with the db, tell the client we're messed UP
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		} else if exists {
+			// the name already exists, try their next preference
+			continue
+		}
+
+		// the name doesn't exist yet. Create the team
+		res, err := nuwc.db.CreateTeamIfNotExists(&types.Team{Tournament: info.TournamentType, Name: info.NamePreferences[i]})
+		if err != nil {
+			// insert failed: something wrong with the db, tell the client we're messed UP
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		// Check that there was actually an update for the team
+		if num, err := res.RowsAffected(); err != nil {
+			// weird issue getting the number of rows affected: something wrong with the db, tell the client we're messed UP
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		} else if num == 0 {
+			// there was no update because another team registered at basically the same time and got the name first, try again
+			continue
+		}
+
+		insertId, err = res.LastInsertId()
+		sheetName = info.NamePreferences[i]
+		break
+	}
+	fmt.Println(sheetName)
+	fmt.Println(insertId)
+	// add all the players to the
+	// tx, _ := nuwc.db.Begin()
+
+	///////////////////////////////////////////////////
+	////////////////// GOOGLE SHEETS //////////////////
+	///////////////////////////////////////////////////
+
 	// Create new sheet
-	err = gtools.AddSheet(spreadsheetId, info.TeamName)
-	// Add logic to handle name already exists
+	err = gtools.AddSheet(spreadsheetId, sheetName)
 	if err != nil {
-		log.Fatal(err)
+		// try for the top name preferences, and if always an error then assign default
+		if err.Error() == "googleapi: Error 400: Invalid requests[0].addSheet: A sheet with the name \""+sheetName+"\" already exists. Please enter another name., badRequest" {
+			// BAD means there's a db issue we need to figure out
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		// unknown error, internalServerError to client
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
 	// add values to the new sheet
-	err = gtools.AddSheetRow(info.TeamName, spreadsheetId, info.Players)
+	// Need function to do this
+	err = gtools.AddSheetRow(sheetName, spreadsheetId, info.NamePreferences)
 	if err != nil {
-		log.Fatal(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+
+	////////////////////////////////////////////////////
+	//////////////// SLACK NOTIFICATION ////////////////
+	////////////////////////////////////////////////////
+
+	// Notify the slack channel that the team registered
+
+	////////////////////////////////////////////////////
+	//////////// SUCCESS RESPONSE TO CLIENT ////////////
+	////////////////////////////////////////////////////
 
 	// respond back to the client that the team was registered
 	fmt.Fprintf(w, "Team Info: %+v", info)
-	fmt.Println("register endpoint was hit")
 }
 
 func main() {
 	// create db instance
 	// TODO:: Use AWS secrets to get username and password
-	db, err := sql.Open("postgres", "postgres://nuwcuser:password@localhost:5432/nuwc?sslmode=disable")
+	db, err := dblib.Open("postgres://nuwcuser:password@localhost:5432/nuwc?sslmode=disable")
 	// Want sslmode to be enable as some point, for now disable
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	// migrate
-	migrate.Migrate(db)
+	// might want to move this to db.go at some point?
+	// migrate should be change to return an error so it can be handled however
+	migrate.Migrate(db.DB)
+
+	// establish a connection
+	err = db.Ping()
+	if err != nil {
+		log.Fatal("Error: Could not establish a connection with the database")
+	}
+
+	// can get password and keep them here as well
+	// inject from aws secrets
+	nuwc := &NUWCData{db: db}
 
 	// Create router
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/", homeLink)
 	router.HandleFunc("/serveWs", serveWs)
-	router.HandleFunc("/register", handleRegister).Methods("POST")
+	router.HandleFunc("/register", nuwc.registerHandler).Methods("POST")
 	//add any new endpoints here
 
 	// Start listening
