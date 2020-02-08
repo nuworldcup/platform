@@ -3,10 +3,20 @@ CREATE TABLE IF NOT EXISTS player(
    first_name VARCHAR (50) NOT NULL DEFAULT '',
    last_name VARCHAR (50) NOT NULL DEFAULT '',
    email VARCHAR (50) NOT NULL DEFAULT '',
-   phone VARCHAR (50) NOT NULL DEFAULT ''
+   phone VARCHAR (50) NOT NULL DEFAULT '',
+   club boolean NOT NULL DEFAULT false
 );
 
 -- may need to add a column for teams or players that no longer exist
+
+CREATE TABLE IF NOT EXISTS tournament(
+   tournament_name VARCHAR (50) UNIQUE PRIMARY KEY
+   --- registration_time
+   -- still need to figure out what this looks like
+);
+
+INSERT INTO tournament(tournament_name) VALUES('coed2020');
+INSERT INTO tournament(tournament_name) VALUES('womens2020');
 
 CREATE TABLE IF NOT EXISTS team(
    team_id serial UNIQUE PRIMARY KEY,
@@ -14,8 +24,11 @@ CREATE TABLE IF NOT EXISTS team(
    icon VARCHAR (50) NOT NULL DEFAULT '',
    wins int NOT NULL DEFAULT 0,
    losses int NOT NULL DEFAULT 0,
-   draws int NOT NULL DEFAULT 0
+   draws int NOT NULL DEFAULT 0,
+   fk_tournament_name VARCHAR (50) REFERENCES tournament(tournament_name) -- many teams to one tournament
 );
+
+CREATE UNIQUE INDEX idx_team_name_tournament ON team(team_name, fk_tournament_name);
 
 -- so a player can be on multiple teams
 -- this table keeps track of which players are on which teams
