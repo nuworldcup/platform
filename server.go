@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/rojaswestall/platform/dblib"
+	"github.com/rojaswestall/platform/gtools"
 	"github.com/rojaswestall/platform/migrate"
 	"github.com/rojaswestall/platform/types"
 
