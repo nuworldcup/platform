@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	"github.com/rojaswestall/platform/dblib"
-	"github.com/rojaswestall/platform/gtools"
 	"github.com/rojaswestall/platform/migrate"
 	"github.com/rojaswestall/platform/types"
 
@@ -124,8 +123,7 @@ func (nuwc *NUWCData) registerHandler(w http.ResponseWriter, r *http.Request) {
 	////////////////////////////////////////////////////
 
 	var sheetName string
-	var insertId int64
-	// var teamId string
+	var teamId int
 
 	// add the team with unique team name
 	for i := 0; i <= len(info.NamePreferences); i++ {
@@ -137,21 +135,17 @@ func (nuwc *NUWCData) registerHandler(w http.ResponseWriter, r *http.Request) {
 			count := 1
 			// try default names until it works
 			for added {
-				res, err := nuwc.db.CreateTeamIfNotExists(&types.Team{Tournament: info.TournamentType, Name: "Team " + strconv.Itoa(count)})
+				id, err := nuwc.db.CreateTeamIfNotExists(&types.Team{Tournament: info.TournamentType, Name: "Team " + strconv.Itoa(count)})
 				if err != nil {
 					// insert failed: something wrong with the db, tell the client we're messed UP
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 				}
-				// Check that there was actually an update for the team
-				if num, err := res.RowsAffected(); err != nil {
-					// weird issue getting the number of rows affected: something wrong with the db, tell the client we're messed UP
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-				} else if num == 0 {
+				if id == 0 {
 					count++
 					continue
 				}
 				// success
-				insertId, err = res.LastInsertId()
+				teamId = id
 				sheetName = "Team " + strconv.Itoa(count)
 				added = false
 			}
@@ -170,52 +164,65 @@ func (nuwc *NUWCData) registerHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// the name doesn't exist yet. Create the team
-		res, err := nuwc.db.CreateTeamIfNotExists(&types.Team{Tournament: info.TournamentType, Name: info.NamePreferences[i]})
+		id, err := nuwc.db.CreateTeamIfNotExists(&types.Team{Tournament: info.TournamentType, Name: info.NamePreferences[i]})
 		if err != nil {
 			// insert failed: something wrong with the db, tell the client we're messed UP
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-
-		// Check that there was actually an update for the team
-		if num, err := res.RowsAffected(); err != nil {
-			// weird issue getting the number of rows affected: something wrong with the db, tell the client we're messed UP
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		} else if num == 0 {
+		if id == 0 {
 			// there was no update because another team registered at basically the same time and got the name first, try again
 			continue
 		}
-
-		insertId, err = res.LastInsertId()
+		teamId = id
 		sheetName = info.NamePreferences[i]
 		break
 	}
-	fmt.Println(sheetName)
-	fmt.Println(insertId)
-	// add all the players to the
-	// tx, _ := nuwc.db.Begin()
+	fmt.Println("teamName: %v", sheetName)
+
+	// add all the players to the db
+	for i := 0; i < len(info.Players); i++ {
+		tx, _ := nuwc.db.Begin()
+		playerId, err := tx.CreatePlayer(&info.Players[i])
+		if err != nil {
+			// something went wrong creating the player
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		tx.AssignPlayerToTeam(teamId, playerId)
+		tx.Commit()
+	}
+	for i := 0; i < len(info.Captains); i++ {
+		tx, _ := nuwc.db.Begin()
+		playerId, err := tx.CreateCaptain(&info.Captains[i])
+		if err != nil {
+			// something went wrong creating the player
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		tx.AssignCaptainToTeam(teamId, playerId)
+		tx.Commit()
+	}
 
 	///////////////////////////////////////////////////
 	////////////////// GOOGLE SHEETS //////////////////
 	///////////////////////////////////////////////////
 
 	// Create new sheet
-	err = gtools.AddSheet(spreadsheetId, sheetName)
-	if err != nil {
-		// try for the top name preferences, and if always an error then assign default
-		if err.Error() == "googleapi: Error 400: Invalid requests[0].addSheet: A sheet with the name \""+sheetName+"\" already exists. Please enter another name., badRequest" {
-			// BAD means there's a db issue we need to figure out
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		// unknown error, internalServerError to client
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	// err = gtools.AddSheet(spreadsheetId, sheetName)
+	// if err != nil {
+	// 	// try for the top name preferences, and if always an error then assign default
+	// 	if err.Error() == "googleapi: Error 400: Invalid requests[0].addSheet: A sheet with the name \""+sheetName+"\" already exists. Please enter another name., badRequest" {
+	// 		// BAD means there's a db issue we need to figure out
+	// 		http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 	}
+	// 	// unknown error, internalServerError to client
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// }
 
-	// add values to the new sheet
-	// Need function to do this
-	err = gtools.AddSheetRow(sheetName, spreadsheetId, info.NamePreferences)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	// // add values to the new sheet
+	// // Need function to do this
+	// err = gtools.AddSheetRow(sheetName, spreadsheetId, info.NamePreferences)
+	// if err != nil {
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// }
 
 	////////////////////////////////////////////////////
 	//////////////// SLACK NOTIFICATION ////////////////
