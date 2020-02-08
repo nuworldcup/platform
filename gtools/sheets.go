@@ -69,6 +69,11 @@ func saveToken(path string, token *oauth2.Token) {
 	json.NewEncoder(f).Encode(token)
 }
 
+////// The above methods are provided by google (but we modified a lil) for quickstart use ^
+////// The below methods were made to make using google sheets easy : )
+////// Add more as needed!
+
+// Set up a service using credentials to perform sheets operations
 func getService() *sheets.Service {
 	b, err := ioutil.ReadFile("gtools/credentials.json")
 	if err != nil {
@@ -88,7 +93,7 @@ func getService() *sheets.Service {
 	return srv
 }
 
-// given sheetId, and name of Team, create add sheet to a spreadsheet
+// Add sheet to a spreadsheet given sheetId and name of sheet
 func AddSheet(spreadsheetId string, name string) error {
 	srv := getService()
 	request := &sheets.Request{
@@ -106,7 +111,7 @@ func AddSheet(spreadsheetId string, name string) error {
 	return err
 }
 
-// given sheet, spreadsheetId, and slice of strings, add to sheet
+// Add strings to a sheet, given sheet name, spreadsheetId, and slice of strings to add
 func AddSheetRow(sheetName string, spreadsheetId string, values []string) error {
 	srv := getService()
 	// wrap name in single quotes to account for spaces
