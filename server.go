@@ -1,12 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/rojaswestall/platform/api"
 	"github.com/rojaswestall/platform/dblib"
+	"github.com/rojaswestall/platform/lib"
 	"github.com/rojaswestall/platform/migrate"
 
 	"github.com/gorilla/mux"
@@ -80,9 +82,14 @@ func (nuwc *NUWCData) registerHandler(w http.ResponseWriter, r *http.Request) {
 	// will need to add spreadsheetId(s), token, maybe email creds, slack
 	err := api.RegisterHandler(w, r, nuwc.db)
 	if err != nil {
-		// internal error
-		fmt.Println("There was an error, still need to implement a graceful handler")
-		// http.Error(w, err.Error(), http.StatusInternalServerError)
+		// can probably make this a function to use in all handlers
+		var mr *lib.MalformedRequest
+		if errors.As(err, &mr) {
+			http.Error(w, mr.Msg, mr.Status)
+		} else {
+			log.Println(err.Error())
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
 	}
 }
 

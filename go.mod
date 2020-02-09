@@ -5,6 +5,7 @@ go 1.13
 require (
 	cloud.google.com/go v0.52.0 // indirect
 	github.com/golang-migrate/migrate/v4 v4.8.0
+	github.com/golang/gddo v0.0.0-20200203211524-5a4fa0264114
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/gorilla/mux v1.7.3
 	github.com/gorilla/websocket v1.4.1

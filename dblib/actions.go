@@ -27,7 +27,13 @@ func (db *DB) CreateTeamIfNotExists(t *types.Team) (int, error) {
 	}
 	// upsert
 	err := db.QueryRow(`INSERT INTO team(team_name, fk_tournament_name) VALUES($1, $2) ON CONFLICT (team_name, fk_tournament_name) DO NOTHING RETURNING (team_id)`, t.Name, t.Tournament).Scan(&teamId)
-	return teamId, err
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return 0, errors.New("team already exists with given name")
+		}
+		return teamId, err
+	}
+	return teamId, nil
 }
 
 ////////////////////////////////////////////////////

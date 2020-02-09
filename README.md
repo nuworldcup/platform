@@ -57,3 +57,17 @@ brew install golang-migrate
 ```
 
 If you want to work with a database version that doesn't include the latest version of migrations, comment out `migrate.Migrate()` in `main()` of `server.go()`, then use the go-lang CLI to migrate to whatever verison you want to use and restart the application. Optionally, you could alter `migrate.go`, but don't push those changes.
+
+## Error Handling
+
+If returning repsonses to a client, you can use `MalformedRequest` in the `/lib` package to create an error to return. This way if an error occurs, we check if it's of type `MalformedRequest` (we created the error and it's not a system issue) and then we return the http status code and message that corresponds to the error that the user's mistake. If it is not of that type, we can return an Internal System Error because we don't know what kind of issue it is.
+
+### System Diagram
+
+    ___________________________        __________________________________________
+    | client (react front-end) | <--> | backend (platform) server <--> db server |
+    ---------------------------        ------------------------------------------
+
+    _____________________________________        ______________________________________       ___________
+    | client (react front-end) on heroku | <--> | backend (platform) server on heroku | <--> | db server |
+    -------------------------------------        --------------------------------------       -----------

@@ -1,21 +1,21 @@
 package types
 
 type Person struct {
-	Id        string `json:"id,omitempty"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Email     string `json:"email"`
+	Id        *string `json:"id,omitempty"`
+	FirstName *string `json:"first_name"`
+	LastName  *string `json:"last_name"`
+	Email     *string `json:"email"`
 }
 
 type Player struct {
 	Person
-	Club bool `json:"club"`
+	Club *bool `json:"club"`
 }
 
 type Captain struct {
 	Person
-	PhoneNumber string `json:"phone"`
-	Club        bool   `json:"club"`
+	PhoneNumber *string `json:"phone"`
+	Club        *bool   `json:"club"`
 }
 
 type Ref struct {
@@ -27,17 +27,18 @@ type Admin struct {
 }
 
 type Team struct {
-	Id         string         `json:"id"`
-	Captains   []Player       `json:"captains"`
-	Players    []Player       `json:"players"` // have this be a list of ids
-	Name       string         `json:"name"`
-	Wins       int            `json:"wins"`
-	Losses     int            `json:"losses"`
-	Draws      int            `json:"draws:"`
-	Icon       string         `json:"icon"` // url of icon or flag to represent team
-	Tournament TournamentType `json:"tournament_type"`
+	Id         string   `json:"id"`
+	Captains   []Player `json:"captains"`
+	Players    []Player `json:"players"` // have this be a list of ids
+	Name       string   `json:"name"`
+	Wins       int      `json:"wins"`
+	Losses     int      `json:"losses"`
+	Draws      int      `json:"draws:"`
+	Icon       string   `json:"icon"` // url of icon or flag to represent team
+	Tournament string   `json:"tournament_type"`
 }
 
+// there is some way to get this from the db and this will not be needed
 type GameState int
 
 const (

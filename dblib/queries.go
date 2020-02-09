@@ -16,3 +16,15 @@ func (db *DB) TeamExists(teamName string) (bool, error) {
 	}
 	return exists, nil
 }
+
+func (db *DB) IsValidTournament(tournamentName string) (bool, error) {
+	if tournamentName == "" {
+		return false, errors.New("tournamentName must not be empty")
+	}
+	var exists bool
+	err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM tournament WHERE tournament_name=$1)`, tournamentName).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
