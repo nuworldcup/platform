@@ -313,7 +313,7 @@ func nuwcRegistrationValidationTeam(info RegistrationInfo, db *dblib.DB) error {
 
 func RegisterHandler(w http.ResponseWriter, r *http.Request, db *dblib.DB) error {
 	// TODO:: Use AWS secrets to set spreadsheetId for sheets
-	// spreadsheetId := "1jDCdULFKmxmgCsJTJgqzKloCvnE85r8PyLvXDAlKLcA"
+	spreadsheetId := "1jDCdULFKmxmgCsJTJgqzKloCvnE85r8PyLvXDAlKLcA"
 	// TODO:: Use AWS secrets to get credentials/token in gtools lib
 
 	// Add everything to our db and then start the google sheets stuffs,
@@ -354,7 +354,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request, db *dblib.DB) error
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return err
 	}
-	fmt.Println(teamName)
+
 	///////////////////////////////////////////////////
 	////////////////// GOOGLE SHEETS //////////////////
 	///////////////////////////////////////////////////
@@ -370,11 +370,11 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request, db *dblib.DB) error
 	// or we can use a different spreadsheetId for the two tournaments
 	// For now assuming two different sheets
 
-	// err = addTeamToSheets(info, spreadsheetId, teamName)
-	// if err != nil {
-	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-	// 	return err
-	// }
+	err = addTeamToSheets(info, spreadsheetId, teamName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return err
+	}
 
 	////////////////////////////////////////////////////
 	//////////////// SLACK NOTIFICATION ////////////////
