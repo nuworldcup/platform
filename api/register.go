@@ -28,6 +28,131 @@ func convertBoolToStringForSheets(b bool) string {
 	return "No"
 }
 
+// adds a team to the db, returns the teamName and any error
+func findAvailableNameAndAddTeamToDb(info RegistrationInfo, db *dblib.DB) (string, error) {
+	var teamName string
+	var teamId int
+
+	// add the team with unique team name
+	for i := 0; i <= len(info.NamePreferences); i++ {
+
+		// all the preferences have already been tried
+		if i == len(info.NamePreferences) {
+			// at this point we could also return a response to the client that all the names have already been taken
+			added := true
+			count := 1
+			// try default names until it works
+			for added {
+				id, err := db.CreateTeamIfNotExists(&types.Team{Tournament: info.TournamentType, Name: "Team " + strconv.Itoa(count)})
+				if err != nil {
+					// insert failed: something wrong with the db, tell the client we're messed UP
+					return "", err
+				}
+				if id == 0 {
+					count++
+					continue
+				}
+				// success
+				teamId = id
+				teamName = "Team " + strconv.Itoa(count)
+				added = false
+			}
+			break
+		}
+
+		// check the db to see if the name already exists
+		exists, err := db.TeamExists(info.NamePreferences[i])
+		if err != nil {
+			// something wrong with the db, tell the client we're messed UP
+			return "", err
+		} else if exists {
+			// the name already exists, try their next preference
+			continue
+		}
+
+		// the name doesn't exist yet. Create the team
+		id, err := db.CreateTeamIfNotExists(&types.Team{Tournament: info.TournamentType, Name: info.NamePreferences[i]})
+		if err != nil {
+			// insert failed: something wrong with the db, tell the client we're messed UP
+			return "", err
+		}
+		if id == 0 {
+			// there was no update because another team registered at basically the same time and got the name first, try again
+			continue
+		}
+		teamId = id
+		teamName = info.NamePreferences[i]
+		break
+	}
+
+	// add all the players to the db
+	for i := 0; i < len(info.Players); i++ {
+		tx, _ := db.Begin()
+		playerId, err := tx.CreatePlayer(&info.Players[i])
+		if err != nil {
+			// something went wrong creating the player
+			return "", err
+		}
+		tx.AssignPlayerToTeam(teamId, playerId)
+		tx.Commit()
+	}
+	for i := 0; i < len(info.Captains); i++ {
+		tx, _ := db.Begin()
+		playerId, err := tx.CreateCaptain(&info.Captains[i])
+		if err != nil {
+			// something went wrong creating the player
+			return "", err
+		}
+		tx.AssignCaptainToTeam(teamId, playerId)
+		tx.Commit()
+	}
+	return teamName, nil
+}
+
+func addTeamToSheets(info RegistrationInfo, spreadsheetId string, teamName string) error {
+	err := gtools.AddSheet(spreadsheetId, teamName)
+	if err != nil {
+		// try for the top name preferences, and if always an error then assign default
+		if err.Error() == "googleapi: Error 400: Invalid requests[0].addSheet: A sheet with the name \""+teamName+"\" already exists. Please enter another name., badRequest" {
+			// BAD means there's a db issue we need to figure out
+			return err
+		}
+
+		// Add error for too many API calls here
+
+		// unknown error, internalServerError to client
+		return err
+	}
+
+	// Add team values
+	var values [][]interface{}
+
+	// This could be MUCH more dynamic but fine for now
+	headers := []interface{}{"First Name", "Last Name", "Email", "Club", "Phone", "Captain"}
+	// Add headers
+	values = append(values, headers)
+
+	// add all players, captains first
+	for i := 0; i < len(info.Captains); i++ {
+		rowVals := []interface{}{info.Captains[i].FirstName, info.Captains[i].LastName, info.Captains[i].Email, convertBoolToStringForSheets(info.Captains[i].Club), info.Captains[i].PhoneNumber, convertBoolToStringForSheets(true)}
+		values = append(values, rowVals)
+	}
+	for i := 0; i < len(info.Players); i++ {
+		rowVals := []interface{}{info.Players[i].FirstName, info.Players[i].LastName, info.Players[i].Email, convertBoolToStringForSheets(info.Players[i].Club), "", convertBoolToStringForSheets(false)}
+		values = append(values, rowVals)
+	}
+
+	err = gtools.AddSheetData(teamName, spreadsheetId, values)
+	if err != nil {
+		// Add error for too many API calls here
+
+		// unknown error, internalServerError to client
+		return err
+	}
+
+	return nil
+}
+
 func RegisterHandler(w http.ResponseWriter, r *http.Request, db *dblib.DB) error {
 	// TODO:: Use AWS secrets to set spreadsheetId for sheets
 	spreadsheetId := "1jDCdULFKmxmgCsJTJgqzKloCvnE85r8PyLvXDAlKLcA"
@@ -63,87 +188,11 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request, db *dblib.DB) error
 	//////////////////// DB UPDATES ////////////////////
 	////////////////////////////////////////////////////
 
-	var sheetName string
-	var teamId int
+	teamName, err := findAvailableNameAndAddTeamToDb(info, db)
 
-	// add the team with unique team name
-	for i := 0; i <= len(info.NamePreferences); i++ {
-
-		// all the preferences have already been tried
-		if i == len(info.NamePreferences) {
-			// at this point we could also return a response to the client that all the names have already been taken
-			added := true
-			count := 1
-			// try default names until it works
-			for added {
-				id, err := db.CreateTeamIfNotExists(&types.Team{Tournament: info.TournamentType, Name: "Team " + strconv.Itoa(count)})
-				if err != nil {
-					// insert failed: something wrong with the db, tell the client we're messed UP
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return err
-				}
-				if id == 0 {
-					count++
-					continue
-				}
-				// success
-				teamId = id
-				sheetName = "Team " + strconv.Itoa(count)
-				added = false
-			}
-			break
-		}
-
-		// check the db to see if the name already exists
-		exists, err := db.TeamExists(info.NamePreferences[i])
-		fmt.Println("Team "+info.NamePreferences[i]+" -- exists: %t", exists)
-		if err != nil {
-			// something wrong with the db, tell the client we're messed UP
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return err
-		} else if exists {
-			// the name already exists, try their next preference
-			continue
-		}
-
-		// the name doesn't exist yet. Create the team
-		id, err := db.CreateTeamIfNotExists(&types.Team{Tournament: info.TournamentType, Name: info.NamePreferences[i]})
-		if err != nil {
-			// insert failed: something wrong with the db, tell the client we're messed UP
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return err
-		}
-		if id == 0 {
-			// there was no update because another team registered at basically the same time and got the name first, try again
-			continue
-		}
-		teamId = id
-		sheetName = info.NamePreferences[i]
-		break
-	}
-
-	// add all the players to the db
-	for i := 0; i < len(info.Players); i++ {
-		tx, _ := db.Begin()
-		playerId, err := tx.CreatePlayer(&info.Players[i])
-		if err != nil {
-			// something went wrong creating the player
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return err
-		}
-		tx.AssignPlayerToTeam(teamId, playerId)
-		tx.Commit()
-	}
-	for i := 0; i < len(info.Captains); i++ {
-		tx, _ := db.Begin()
-		playerId, err := tx.CreateCaptain(&info.Captains[i])
-		if err != nil {
-			// something went wrong creating the player
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return err
-		}
-		tx.AssignCaptainToTeam(teamId, playerId)
-		tx.Commit()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return err
 	}
 
 	///////////////////////////////////////////////////
@@ -154,51 +203,14 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request, db *dblib.DB) error
 	// Right now it takes 2 API calls to create a team, and 1 to add an individual
 
 	// TODO:: Account for reaching API limit -- add cron (?) or a queue to add to
-	//        sheet once we have waited an hour
+	//        sheet once we have waited an hour. Could check on error
 
 	// Create new sheet for team
 	// We can either alter the sheetName to have the tournament_type too
 	// or we can use a different spreadsheetId for the two tournaments
 	// For now assuming two different sheets
-	err = gtools.AddSheet(spreadsheetId, sheetName)
+	err = addTeamToSheets(info, spreadsheetId, teamName)
 	if err != nil {
-		// try for the top name preferences, and if always an error then assign default
-		if err.Error() == "googleapi: Error 400: Invalid requests[0].addSheet: A sheet with the name \""+sheetName+"\" already exists. Please enter another name., badRequest" {
-			// BAD means there's a db issue we need to figure out
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return err
-		}
-
-		// Add error for too many API calls here
-
-		// unknown error, internalServerError to client
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return err
-	}
-
-	// Add team values
-	var values [][]interface{}
-
-	// This could be MUCH more dynamic but fine for now
-	headers := []interface{}{"First Name", "Last Name", "Email", "Club", "Phone", "Captain"}
-	// Add headers
-	values = append(values, headers)
-
-	// add all players, captains first
-	for i := 0; i < len(info.Captains); i++ {
-		rowVals := []interface{}{info.Captains[i].FirstName, info.Captains[i].LastName, info.Captains[i].Email, convertBoolToStringForSheets(info.Captains[i].Club), info.Captains[i].PhoneNumber, convertBoolToStringForSheets(true)}
-		values = append(values, rowVals)
-	}
-	for i := 0; i < len(info.Players); i++ {
-		rowVals := []interface{}{info.Players[i].FirstName, info.Players[i].LastName, info.Players[i].Email, convertBoolToStringForSheets(info.Players[i].Club), "", convertBoolToStringForSheets(false)}
-		values = append(values, rowVals)
-	}
-
-	err = gtools.AddSheetData(sheetName, spreadsheetId, values)
-	if err != nil {
-		// Add error for too many API calls here
-
-		// unknown error, internalServerError to client
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return err
 	}
