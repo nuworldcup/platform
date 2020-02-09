@@ -12,11 +12,11 @@ import (
 )
 
 type RegistrationInfo struct {
-	RegistrationType types.RegistrationType `json:"registration_type"`          // cannot be empty
-	TournamentType   string                 `json:"tournament_type"`            // cannot be empty
-	NamePreferences  []string               `json:"name_preferences,omitempty"` // can have as many preferences as they want
-	Captains         []types.Captain        `json:"captains,omitempty"`         // can have as many captains as they want
-	Players          []types.Player         `json:"players"`                    // cannot be empty
+	RegistrationType *types.RegistrationType `json:"registration_type"`          // cannot be empty
+	TournamentType   *string                 `json:"tournament_type"`            // cannot be empty
+	NamePreferences  *[]string               `json:"name_preferences,omitempty"` // can have as many preferences as they want
+	Captains         *[]types.Captain        `json:"captains,omitempty"`         // can have as many captains as they want
+	Players          *[]types.Player         `json:"players"`                    // cannot be empty
 }
 
 // Creat a map from country name to 3 digit code that tells us what flag to use OR keep that on the front end
@@ -35,16 +35,16 @@ func findAvailableNameAndAddTeamToDb(info RegistrationInfo, db *dblib.DB) (strin
 	var teamId int
 
 	// add the team with unique team name
-	for i := 0; i <= len(info.NamePreferences); i++ {
+	for i := 0; i <= len(*info.NamePreferences); i++ {
 
 		// all the preferences have already been tried
-		if i == len(info.NamePreferences) {
+		if i == len(*info.NamePreferences) {
 			// at this point we could also return a response to the client that all the names have already been taken
 			added := true
 			count := 1
 			// try default names until it works
 			for added {
-				id, err := db.CreateTeamIfNotExists(&types.Team{Tournament: info.TournamentType, Name: "Team " + strconv.Itoa(count)})
+				id, err := db.CreateTeamIfNotExists(&types.Team{Tournament: *info.TournamentType, Name: "Team " + strconv.Itoa(count)})
 				if err != nil {
 					if err.Error() == "team already exists with given name" {
 						count++
@@ -63,7 +63,7 @@ func findAvailableNameAndAddTeamToDb(info RegistrationInfo, db *dblib.DB) (strin
 		}
 
 		// check the db to see if the name already exists
-		exists, err := db.TeamExists(info.NamePreferences[i])
+		exists, err := db.TeamExists((*info.NamePreferences)[i])
 		if err != nil {
 			// something wrong with the db, tell the client we're messed UP
 			return "", err
@@ -73,7 +73,7 @@ func findAvailableNameAndAddTeamToDb(info RegistrationInfo, db *dblib.DB) (strin
 		}
 
 		// the name doesn't exist yet. Create the team
-		id, err := db.CreateTeamIfNotExists(&types.Team{Tournament: info.TournamentType, Name: info.NamePreferences[i]})
+		id, err := db.CreateTeamIfNotExists(&types.Team{Tournament: *info.TournamentType, Name: (*info.NamePreferences)[i]})
 		if err != nil {
 			if err.Error() == "team already exists with given name" {
 				// there was no update because another team registered at basically the same time and got the name first, try again
@@ -83,14 +83,14 @@ func findAvailableNameAndAddTeamToDb(info RegistrationInfo, db *dblib.DB) (strin
 			return "", err
 		}
 		teamId = id
-		teamName = info.NamePreferences[i]
+		teamName = (*info.NamePreferences)[i]
 		break
 	}
 
 	// add all the players to the db
-	for i := 0; i < len(info.Players); i++ {
+	for i := 0; i < len(*info.Players); i++ {
 		tx, _ := db.Begin()
-		playerId, err := tx.CreatePlayer(&info.Players[i])
+		playerId, err := tx.CreatePlayer(&(*info.Players)[i])
 		if err != nil {
 			// something went wrong creating the player
 			return "", err
@@ -98,9 +98,9 @@ func findAvailableNameAndAddTeamToDb(info RegistrationInfo, db *dblib.DB) (strin
 		tx.AssignPlayerToTeam(teamId, playerId)
 		tx.Commit()
 	}
-	for i := 0; i < len(info.Captains); i++ {
+	for i := 0; i < len(*info.Captains); i++ {
 		tx, _ := db.Begin()
-		playerId, err := tx.CreateCaptain(&info.Captains[i])
+		playerId, err := tx.CreateCaptain(&(*info.Captains)[i])
 		if err != nil {
 			// something went wrong creating the player
 			return "", err
@@ -135,12 +135,12 @@ func addTeamToSheets(info RegistrationInfo, spreadsheetId string, teamName strin
 	values = append(values, headers)
 
 	// add all players, captains first
-	for i := 0; i < len(info.Captains); i++ {
-		rowVals := []interface{}{info.Captains[i].FirstName, info.Captains[i].LastName, info.Captains[i].Email, convertBoolToStringForSheets(*info.Captains[i].Club), info.Captains[i].PhoneNumber, convertBoolToStringForSheets(true)}
+	for i := 0; i < len(*info.Captains); i++ {
+		rowVals := []interface{}{(*info.Captains)[i].FirstName, (*info.Captains)[i].LastName, (*info.Captains)[i].Email, convertBoolToStringForSheets(*(*info.Captains)[i].Club), (*info.Captains)[i].PhoneNumber, convertBoolToStringForSheets(true)}
 		values = append(values, rowVals)
 	}
-	for i := 0; i < len(info.Players); i++ {
-		rowVals := []interface{}{info.Players[i].FirstName, info.Players[i].LastName, info.Players[i].Email, convertBoolToStringForSheets(*info.Players[i].Club), "", convertBoolToStringForSheets(false)}
+	for i := 0; i < len(*info.Players); i++ {
+		rowVals := []interface{}{(*info.Players)[i].FirstName, (*info.Players)[i].LastName, (*info.Players)[i].Email, convertBoolToStringForSheets(*(*info.Players)[i].Club), "", convertBoolToStringForSheets(false)}
 		values = append(values, rowVals)
 	}
 
@@ -155,7 +155,9 @@ func addTeamToSheets(info RegistrationInfo, spreadsheetId string, teamName strin
 	return nil
 }
 
+////////////////////////////////
 /////// VALIDATE REQUEST ///////
+////////////////////////////////
 
 func validatePerson(p types.Person) error {
 	if p.FirstName == nil {
@@ -202,26 +204,40 @@ func validateCaptain(c types.Captain) error {
 }
 
 func nuwcRegistrationValidationIndividual(info RegistrationInfo, db *dblib.DB) error {
-	if exists, err := db.IsValidTournament(info.TournamentType); err != nil {
+	if info.TournamentType == nil {
+		msg := fmt.Sprintf("tournament_type required")
+		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
+	}
+
+	if exists, err := db.IsValidTournament(*info.TournamentType); err != nil {
 		return err
 	} else if !exists {
 		msg := fmt.Sprintf("invalid tournament_type")
 		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
 	}
 
-	if len(info.Captains) > 1 {
-		msg := fmt.Sprintf("length of captains > 1")
+	if info.Captains != nil {
+		if len(*info.Captains) > 1 {
+			msg := fmt.Sprintf("length of captains > 1")
+			return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
+		}
+	}
+
+	if info.Players == nil {
+		msg := fmt.Sprintf("players required for registration_type = individual")
 		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
 	}
 
-	if len(info.Players) != 1 {
+	if len(*info.Players) != 1 {
 		msg := fmt.Sprintf("length of players != 1")
 		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
 	}
 
-	if len(info.NamePreferences) > 1 {
-		msg := fmt.Sprintf("length of name_preferences > 1")
-		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
+	if info.NamePreferences != nil {
+		if len(*info.NamePreferences) > 1 {
+			msg := fmt.Sprintf("length of name_preferences > 1")
+			return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
+		}
 	}
 
 	// validate that it's after the time to register
@@ -230,38 +246,58 @@ func nuwcRegistrationValidationIndividual(info RegistrationInfo, db *dblib.DB) e
 }
 
 func nuwcRegistrationValidationTeam(info RegistrationInfo, db *dblib.DB) error {
-	if exists, err := db.IsValidTournament(info.TournamentType); err != nil {
+	if info.TournamentType == nil {
+		msg := fmt.Sprintf("tournament_type required")
+		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
+	}
+
+	if exists, err := db.IsValidTournament(*info.TournamentType); err != nil {
 		return err
 	} else if !exists {
 		msg := fmt.Sprintf("invalid tournament_type")
 		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
 	}
 
-	if len(info.Captains) < 1 {
+	if info.Captains == nil {
+		msg := fmt.Sprintf("captains required for registration_type = team")
+		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
+	}
+
+	if len(*info.Captains) < 1 {
 		msg := fmt.Sprintf("length of captains < 1")
 		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
 	}
 
-	for i := 0; i < len(info.Captains); i++ {
-		err := validateCaptain(info.Captains[i])
+	for i := 0; i < len(*info.Captains); i++ {
+		err := validateCaptain((*info.Captains)[i])
 		if err != nil {
 			return err
 		}
 	}
 
-	if len(info.Players) < 8 {
+	if info.Players == nil {
+		msg := fmt.Sprintf("players required for registration_type = team")
+		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
+	}
+
+	if len(*info.Players) < 8 {
 		msg := fmt.Sprintf("length of players < 8")
 		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
 	}
 
-	for i := 0; i < len(info.Players); i++ {
-		err := validatePlayer(info.Players[i])
+	for i := 0; i < len(*info.Players); i++ {
+		err := validatePlayer((*info.Players)[i])
 		if err != nil {
 			return err
 		}
 	}
 
-	if len(info.NamePreferences) < 3 {
+	if info.NamePreferences == nil {
+		msg := fmt.Sprintf("name_preferences required for registration_type = team")
+		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
+	}
+
+	if len(*info.NamePreferences) < 3 {
 		msg := fmt.Sprintf("length of name_preferences < 3")
 		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
 	}
@@ -277,7 +313,7 @@ func nuwcRegistrationValidationTeam(info RegistrationInfo, db *dblib.DB) error {
 
 func RegisterHandler(w http.ResponseWriter, r *http.Request, db *dblib.DB) error {
 	// TODO:: Use AWS secrets to set spreadsheetId for sheets
-	spreadsheetId := "1jDCdULFKmxmgCsJTJgqzKloCvnE85r8PyLvXDAlKLcA"
+	// spreadsheetId := "1jDCdULFKmxmgCsJTJgqzKloCvnE85r8PyLvXDAlKLcA"
 	// TODO:: Use AWS secrets to get credentials/token in gtools lib
 
 	// Add everything to our db and then start the google sheets stuffs,
@@ -294,6 +330,12 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request, db *dblib.DB) error
 	///////////////////////////////////////////////////
 	///////////// VALIDATE REQUEST FORMAT /////////////
 	///////////////////////////////////////////////////
+
+	if info.RegistrationType == nil {
+		msg := fmt.Sprintf("registration_type required")
+		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
+	}
+
 	err = nuwcRegistrationValidationTeam(info, db)
 	if err != nil {
 		return err
@@ -312,7 +354,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request, db *dblib.DB) error
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return err
 	}
-
+	fmt.Println(teamName)
 	///////////////////////////////////////////////////
 	////////////////// GOOGLE SHEETS //////////////////
 	///////////////////////////////////////////////////
@@ -327,11 +369,12 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request, db *dblib.DB) error
 	// We can either alter the sheetName to have the tournament_type too
 	// or we can use a different spreadsheetId for the two tournaments
 	// For now assuming two different sheets
-	err = addTeamToSheets(info, spreadsheetId, teamName)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return err
-	}
+
+	// err = addTeamToSheets(info, spreadsheetId, teamName)
+	// if err != nil {
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 	return err
+	// }
 
 	////////////////////////////////////////////////////
 	//////////////// SLACK NOTIFICATION ////////////////
@@ -350,7 +393,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request, db *dblib.DB) error
 	//////////// SUCCESS RESPONSE TO CLIENT ////////////
 	////////////////////////////////////////////////////
 
-	// respond back to the client that the team was registered
+	// TODO :: respond back to the client that the team was registered
 	// need a better response. Maybe the team name
 	fmt.Fprintf(w, "Team Info: %+v", info)
 	return nil
