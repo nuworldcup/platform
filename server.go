@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/rojaswestall/platform/dblib"
+	"github.com/rojaswestall/platform/gtools"
 	"github.com/rojaswestall/platform/migrate"
 	"github.com/rojaswestall/platform/types"
 
@@ -87,9 +88,16 @@ type RegistrationInfo struct {
 
 // Creat a map from country name to 3 digit code that tells us what flag to use OR keep that on the front end
 
+func convertBoolToStringForSheets(b bool) string {
+	if b {
+		return "Yes"
+	}
+	return "No"
+}
+
 func (nuwc *NUWCData) registerHandler(w http.ResponseWriter, r *http.Request) {
 	// TODO:: Use AWS secrets to set spreadsheetId for sheets
-	// spreadsheetId := "1jDCdULFKmxmgCsJTJgqzKloCvnE85r8PyLvXDAlKLcA"
+	spreadsheetId := "1jDCdULFKmxmgCsJTJgqzKloCvnE85r8PyLvXDAlKLcA"
 	// TODO:: Use AWS secrets to get credentials/token in gtools lib
 
 	// Add everything to our db and then start the google sheets stuffs,
@@ -177,7 +185,6 @@ func (nuwc *NUWCData) registerHandler(w http.ResponseWriter, r *http.Request) {
 		sheetName = info.NamePreferences[i]
 		break
 	}
-	fmt.Println("teamName: %v", sheetName)
 
 	// add all the players to the db
 	for i := 0; i < len(info.Players); i++ {
@@ -205,24 +212,55 @@ func (nuwc *NUWCData) registerHandler(w http.ResponseWriter, r *http.Request) {
 	////////////////// GOOGLE SHEETS //////////////////
 	///////////////////////////////////////////////////
 
-	// Create new sheet
-	// err = gtools.AddSheet(spreadsheetId, sheetName)
-	// if err != nil {
-	// 	// try for the top name preferences, and if always an error then assign default
-	// 	if err.Error() == "googleapi: Error 400: Invalid requests[0].addSheet: A sheet with the name \""+sheetName+"\" already exists. Please enter another name., badRequest" {
-	// 		// BAD means there's a db issue we need to figure out
-	// 		http.Error(w, err.Error(), http.StatusInternalServerError)
-	// 	}
-	// 	// unknown error, internalServerError to client
-	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-	// }
+	// Try to keep API calls AS LOW AS POSSIBLE. We only get 500 per hour
+	// Right now it takes 2 API calls to create a team, and 1 to add an individual
 
-	// // add values to the new sheet
-	// // Need function to do this
-	// err = gtools.AddSheetRow(sheetName, spreadsheetId, info.NamePreferences)
-	// if err != nil {
-	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-	// }
+	// TODO:: Account for reaching API limit -- add cron (?) or a queue to add to
+	//        sheet once we have waited an hour
+
+	// Create new sheet for team
+	// We can either alter the sheetName to have the tournament_type too
+	// or we can use a different spreadsheetId for the two tournaments
+	// For now assuming two different sheets
+	err = gtools.AddSheet(spreadsheetId, sheetName)
+	if err != nil {
+		// try for the top name preferences, and if always an error then assign default
+		if err.Error() == "googleapi: Error 400: Invalid requests[0].addSheet: A sheet with the name \""+sheetName+"\" already exists. Please enter another name., badRequest" {
+			// BAD means there's a db issue we need to figure out
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		// Add error for too many API calls here
+
+		// unknown error, internalServerError to client
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	// Add team values
+	var values [][]interface{}
+
+	// This could be MUCH more dynamic but fine for now
+	headers := []interface{}{"First Name", "Last Name", "Email", "Club", "Phone", "Captain"}
+	// Add headers
+	values = append(values, headers)
+
+	// add all players, captains first
+	for i := 0; i < len(info.Captains); i++ {
+		rowVals := []interface{}{info.Captains[i].FirstName, info.Captains[i].LastName, info.Captains[i].Email, convertBoolToStringForSheets(info.Captains[i].Club), info.Captains[i].PhoneNumber, convertBoolToStringForSheets(true)}
+		values = append(values, rowVals)
+	}
+	for i := 0; i < len(info.Players); i++ {
+		rowVals := []interface{}{info.Players[i].FirstName, info.Players[i].LastName, info.Players[i].Email, convertBoolToStringForSheets(info.Players[i].Club), "", convertBoolToStringForSheets(false)}
+		values = append(values, rowVals)
+	}
+
+	err = gtools.AddSheetData(sheetName, spreadsheetId, values)
+	if err != nil {
+		// Add error for too many API calls here
+
+		// unknown error, internalServerError to client
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 
 	////////////////////////////////////////////////////
 	//////////////// SLACK NOTIFICATION ////////////////

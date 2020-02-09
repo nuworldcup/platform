@@ -73,6 +73,8 @@ func saveToken(path string, token *oauth2.Token) {
 ////// The below methods were made to make using google sheets easy : )
 ////// Add more as needed!
 
+// TODO: Write formatting function to allow for styling : ) Ideally this would be added to all inserts as well
+
 // Set up a service using credentials to perform sheets operations
 func getService() *sheets.Service {
 	b, err := ioutil.ReadFile("gtools/credentials.json")
@@ -111,26 +113,36 @@ func AddSheet(spreadsheetId string, name string) error {
 	return err
 }
 
-// Add strings to a sheet, given sheet name, spreadsheetId, and slice of strings to add
-func AddSheetRow(sheetName string, spreadsheetId string, values []string) error {
+// Add values to a sheet as a row, given sheet name, spreadsheetId, and slice of values to add
+func AddSheetRow(sheetName string, spreadsheetId string, values []interface{}) error {
 	srv := getService()
 	// wrap name in single quotes to account for spaces
 	writeRange := "'" + sheetName + "'"
 
 	var vr sheets.ValueRange
 
-	newRow := make([]interface{}, len(values))
-	for i, v := range values {
-		newRow[i] = v
-	}
-	vr.Values = append(vr.Values, newRow)
+	vr.Values = append(vr.Values, values)
 
 	valueInputOption := "RAW"
 	insertDataOption := "INSERT_ROWS"
 
 	_, err := srv.Spreadsheets.Values.Append(spreadsheetId, writeRange, &vr).ValueInputOption(valueInputOption).InsertDataOption(insertDataOption).Do()
-	// if err != nil {
-	// 	log.Fatalf("Unable to retrieve data from sheet. %v", err)
-	// }
+	return err
+}
+
+// Add multiple rows of values to a sheet, given sheet name, spreadsheetId, and slice of slices of values to add
+func AddSheetData(sheetName string, spreadsheetId string, values [][]interface{}) error {
+	srv := getService()
+	// wrap name in single quotes to account for spaces
+	writeRange := "'" + sheetName + "'"
+
+	var vr sheets.ValueRange
+
+	vr.Values = values
+
+	valueInputOption := "RAW"
+	insertDataOption := "INSERT_ROWS"
+
+	_, err := srv.Spreadsheets.Values.Append(spreadsheetId, writeRange, &vr).ValueInputOption(valueInputOption).InsertDataOption(insertDataOption).Do()
 	return err
 }
