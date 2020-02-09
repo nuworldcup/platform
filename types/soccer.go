@@ -14,7 +14,7 @@ type Player struct {
 
 type Captain struct {
 	Person
-	PhoneNumber string `json:"number"`
+	PhoneNumber string `json:"phone"`
 	Club        bool   `json:"club"`
 }
 
