@@ -23,7 +23,7 @@ func (db *DB) CreateTeamIfNotExists(t *types.Team) (int, error) {
 		return teamId, errors.New("team_name must not be empty")
 	}
 	if t.Tournament == "" {
-		return teamId, errors.New("tournament_type must not be empty")
+		return teamId, errors.New("tournament_name must not be empty")
 	}
 	// upsert
 	err := db.QueryRow(`INSERT INTO team(team_name, fk_tournament_name) VALUES($1, $2) ON CONFLICT (team_name, fk_tournament_name) DO NOTHING RETURNING (team_id)`, t.Name, t.Tournament).Scan(&teamId)

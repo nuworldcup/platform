@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/rojaswestall/platform/dblib"
 	"github.com/rojaswestall/platform/gtools"
@@ -13,7 +14,7 @@ import (
 
 type RegistrationInfo struct {
 	RegistrationType *types.RegistrationType `json:"registration_type"`          // cannot be empty
-	TournamentType   *string                 `json:"tournament_type"`            // cannot be empty
+	TournamentName   *string                 `json:"tournament_name"`            // cannot be empty
 	NamePreferences  *[]string               `json:"name_preferences,omitempty"` // can have as many preferences as they want
 	Captains         *[]types.Captain        `json:"captains,omitempty"`         // can have as many captains as they want
 	Players          *[]types.Player         `json:"players"`                    // cannot be empty
@@ -44,7 +45,7 @@ func findAvailableNameAndAddTeamToDb(info RegistrationInfo, db *dblib.DB) (strin
 			count := 1
 			// try default names until it works
 			for added {
-				id, err := db.CreateTeamIfNotExists(&types.Team{Tournament: *info.TournamentType, Name: "Team " + strconv.Itoa(count)})
+				id, err := db.CreateTeamIfNotExists(&types.Team{Tournament: *info.TournamentName, Name: "Team " + strconv.Itoa(count)})
 				if err != nil {
 					if err.Error() == "team already exists with given name" {
 						count++
@@ -73,7 +74,7 @@ func findAvailableNameAndAddTeamToDb(info RegistrationInfo, db *dblib.DB) (strin
 		}
 
 		// the name doesn't exist yet. Create the team
-		id, err := db.CreateTeamIfNotExists(&types.Team{Tournament: *info.TournamentType, Name: (*info.NamePreferences)[i]})
+		id, err := db.CreateTeamIfNotExists(&types.Team{Tournament: *info.TournamentName, Name: (*info.NamePreferences)[i]})
 		if err != nil {
 			if err.Error() == "team already exists with given name" {
 				// there was no update because another team registered at basically the same time and got the name first, try again
@@ -204,15 +205,15 @@ func validateCaptain(c types.Captain) error {
 }
 
 func nuwcRegistrationValidationIndividual(info RegistrationInfo, db *dblib.DB) error {
-	if info.TournamentType == nil {
-		msg := fmt.Sprintf("tournament_type required")
+	if info.TournamentName == nil {
+		msg := fmt.Sprintf("tournament_name required")
 		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
 	}
 
-	if exists, err := db.IsValidTournament(*info.TournamentType); err != nil {
+	if exists, err := db.IsValidTournament(*info.TournamentName); err != nil {
 		return err
 	} else if !exists {
-		msg := fmt.Sprintf("invalid tournament_type")
+		msg := fmt.Sprintf("invalid tournament_name")
 		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
 	}
 
@@ -240,21 +241,29 @@ func nuwcRegistrationValidationIndividual(info RegistrationInfo, db *dblib.DB) e
 		}
 	}
 
-	// validate that it's after the time to register
+	if tournament, err := db.GetTournament(*info.TournamentName); err != nil {
+		return err
+	} else {
+		now := time.Now()
+		if now.Before(tournament.RegistrationTime) {
+			msg := fmt.Sprintf("registration is not open for this tournament")
+			return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
+		}
+	}
 
 	return nil
 }
 
 func nuwcRegistrationValidationTeam(info RegistrationInfo, db *dblib.DB) error {
-	if info.TournamentType == nil {
-		msg := fmt.Sprintf("tournament_type required")
+	if info.TournamentName == nil {
+		msg := fmt.Sprintf("tournament_name required")
 		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
 	}
 
-	if exists, err := db.IsValidTournament(*info.TournamentType); err != nil {
+	if exists, err := db.IsValidTournament(*info.TournamentName); err != nil {
 		return err
 	} else if !exists {
-		msg := fmt.Sprintf("invalid tournament_type")
+		msg := fmt.Sprintf("invalid tournament_name")
 		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
 	}
 
@@ -302,7 +311,15 @@ func nuwcRegistrationValidationTeam(info RegistrationInfo, db *dblib.DB) error {
 		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
 	}
 
-	// validate that it's after the time to register
+	if tournament, err := db.GetTournament(*info.TournamentName); err != nil {
+		return err
+	} else {
+		now := time.Now()
+		if now.Before(tournament.RegistrationTime) {
+			msg := fmt.Sprintf("registration is not open for this tournament")
+			return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
+		}
+	}
 
 	return nil
 }
@@ -366,7 +383,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request, db *dblib.DB) error
 	//        sheet once we have waited an hour. Could check on error
 
 	// Create new sheet for team
-	// We can either alter the sheetName to have the tournament_type too
+	// We can either alter the sheetName to have the tournament_name too
 	// or we can use a different spreadsheetId for the two tournaments
 	// For now assuming two different sheets
 

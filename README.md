@@ -34,6 +34,18 @@ psql nuwc -c "\d player"
 
 For basic `psql` commands visit this [cheatsheet](https://jazstudios.blogspot.com/2010/06/postgresql-login-commands.html)
 
+#### Add Tournaments
+
+In order for someone to use most of the endpoint, it assumes that there is a tournament made. In the current documentation
+
+TODO:: Endpoint that creates tournaments so admins can create this from a web or mobile app
+
+```
+INSERT INTO tournament(tournament_name, display_name, tournament_timestamp, registration_timestamp) VALUES('coed2020', '2020 Northwestern World Cup', 'May 22 09:00:00 2020 CST', 'February 9 13:00:00 2020 CST');
+
+INSERT INTO tournament(tournament_name, display_name, tournament_timestamp, registration_timestamp) VALUES('womens2020', '2020 Women''s NU World Cup', 'May 22 09:00:00 2020 CST', 'March 9 13:00:00 2020 CST');
+```
+
 #### Google Sheets setup
 
 For the app to be able update a spreadsheet you need to add your spreadsheet ID in `server.go`. Do not push `token.go` to github as it contains a token only acquired after authorization from a google account. If you want to use google sheets functionality locally, you'll need to manually authenticate on a browser the first time you use one of the available functions in `sheets.go`. Follow the instructions on the command line and in the browser and a `token.json` file will be added to `gtools/` and all api calls from that point forward will use the `token.json` file to authenticate.
@@ -62,7 +74,7 @@ If you want to work with a database version that doesn't include the latest vers
 
 If returning repsonses to a client, you can use `MalformedRequest` in the `/lib` package to create an error to return. This way if an error occurs, we check if it's of type `MalformedRequest` (we created the error and it's not a system issue) and then we return the http status code and message that corresponds to the error that the user's mistake. If it is not of that type, we can return an Internal System Error because we don't know what kind of issue it is.
 
-### System Diagram
+## System Diagram
 
     ___________________________        __________________________________________
     | client (react front-end) | <--> | backend (platform) server <--> db server |

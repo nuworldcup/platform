@@ -1,5 +1,7 @@
 package types
 
+import "time"
+
 type Person struct {
 	Id        *string `json:"id,omitempty"`
 	FirstName *string `json:"first_name"`
@@ -35,7 +37,7 @@ type Team struct {
 	Losses     int      `json:"losses"`
 	Draws      int      `json:"draws:"`
 	Icon       string   `json:"icon"` // url of icon or flag to represent team
-	Tournament string   `json:"tournament_type"`
+	Tournament string   `json:"tournament_name"`
 }
 
 // there is some way to get this from the db and this will not be needed
@@ -86,20 +88,11 @@ type Game struct {
 	// Refs          []string  // ids of the refs
 }
 
-// This type could be improved to be dymanic based on the year when the
-// tournament is played. Right now this needs to be updated manually to
-// account for many teams from different years being able to exist in the db
-// Probably would want to create a small db table for this with migrations
-// being added each year to make sure the type exists
-type TournamentType string
-
-const (
-	Coed20   TournamentType = "coed2020"
-	Womens20 TournamentType = "womens2020"
-)
-
-func (tt TournamentType) isValid() bool {
-	return true
+type Tournament struct {
+	TournamentName   string    `json:"tournament_name"`
+	DisplayName      string    `json:"display_name"`
+	TournamentTime   time.Time `json:"tournament_timestamp"`
+	RegistrationTime time.Time `json:"registration_timestamp"`
 }
 
 // Probably need to create a small db table for this too

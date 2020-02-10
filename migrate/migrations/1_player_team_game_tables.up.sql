@@ -10,13 +10,13 @@ CREATE TABLE IF NOT EXISTS player(
 -- may need to add a column for teams or players that no longer exist
 
 CREATE TABLE IF NOT EXISTS tournament(
-   tournament_name VARCHAR (50) UNIQUE PRIMARY KEY
+   tournament_name VARCHAR (50) UNIQUE PRIMARY KEY,
+   display_name VARCHAR (50) NOT NULL DEFAULT '',
+   tournament_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   registration_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
    --- registration_time
    -- still need to figure out what this looks like
 );
-
-INSERT INTO tournament(tournament_name) VALUES('coed2020');
-INSERT INTO tournament(tournament_name) VALUES('womens2020');
 
 CREATE TABLE IF NOT EXISTS team(
    team_id serial UNIQUE PRIMARY KEY,
@@ -58,3 +58,5 @@ CREATE TABLE IF NOT EXISTS soccer_game(
 );
 
 -- may want to create soccer_game_ref and ref tables?? Not too worried about it for now
+
+SET TIMEZONE = 'US/Central';
