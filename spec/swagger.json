@@ -10,10 +10,10 @@
       "name" : "Apache 2.0",
       "url" : "http://www.apache.org/licenses/LICENSE-2.0.html"
     },
-    "version" : "1.0.2"
+    "version" : "1.0.3"
   },
   "servers" : [ {
-    "url" : "https://virtserver.swaggerhub.com/nuworldcup/platform/1.0.2",
+    "url" : "https://virtserver.swaggerhub.com/nuworldcup/platform/1.0.3",
     "description" : "SwaggerHub API Auto Mocking"
   } ],
   "tags" : [ {
@@ -21,6 +21,40 @@
     "description" : "Operations available to regular developers"
   } ],
   "paths" : {
+    "/registrationOpen/{tournament_type}" : {
+      "get" : {
+        "tags" : [ "developers" ],
+        "summary" : "checks if registration is open",
+        "description" : "Given a specific `tournament_type`, returns whether registration is open or not. `tournament_type` can be one of `['coed2020', 'womens2020']`.",
+        "operationId" : "registrationOpen",
+        "parameters" : [ {
+          "name" : "tournament_type",
+          "in" : "path",
+          "description" : "type of tournament to look up",
+          "required" : true,
+          "style" : "simple",
+          "explode" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "the request was succesful and the answer is in the body of the response",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "boolean"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "bad input parameter"
+          }
+        }
+      }
+    },
     "/register" : {
       "post" : {
         "tags" : [ "developers" ],
@@ -43,6 +77,9 @@
           },
           "400" : {
             "description" : "invalid input, object invalid"
+          },
+          "405" : {
+            "description" : "method not allowed"
           },
           "500" : {
             "description" : "internal server error"
@@ -111,7 +148,7 @@
           },
           "tournament_type" : {
             "type" : "string",
-            "enum" : [ "coed", "womens" ]
+            "enum" : [ "coed2020", "womens2020" ]
           },
           "name_preferences" : {
             "type" : "array",
