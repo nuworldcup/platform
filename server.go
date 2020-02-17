@@ -91,6 +91,25 @@ func (nuwc *NUWCData) registerHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		}
 	}
+	// return happy response
+}
+
+func (nuwc *NUWCData) registrationOpenHandler(w http.ResponseWriter, r *http.Request) {
+	tournamentName := mux.Vars(r)["tournament_name"]
+	open, err := api.RegistrationOpenHandler(nuwc.db, tournamentName)
+	if err != nil {
+		// can probably make this a function to use in all handlers
+		var mr *lib.MalformedRequest
+		if errors.As(err, &mr) {
+			http.Error(w, mr.Msg, mr.Status)
+		} else {
+			log.Println(err.Error())
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
+	} else {
+		// TODO:: return happy response
+		fmt.Fprintf(w, "%t", open)
+	}
 }
 
 func main() {
@@ -121,6 +140,7 @@ func main() {
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/", homeLink)
 	router.HandleFunc("/serveWs", serveWs)
+	router.HandleFunc("/registrationOpen/{tournament_name}", nuwc.registrationOpenHandler)
 	router.HandleFunc("/register", nuwc.registerHandler).Methods("POST")
 	//add any new endpoints here
 

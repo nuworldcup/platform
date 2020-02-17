@@ -14,7 +14,7 @@ import (
 
 type RegistrationInfo struct {
 	RegistrationType *types.RegistrationType `json:"registration_type"`          // cannot be empty
-	TournamentName   *string                 `json:"tournament_name"`            // cannot be empty
+	TournamentId     *string                 `json:"tournament_id"`              // cannot be empty
 	NamePreferences  *[]string               `json:"name_preferences,omitempty"` // can have as many preferences as they want
 	Captains         *[]types.Captain        `json:"captains,omitempty"`         // can have as many captains as they want
 	Players          *[]types.Player         `json:"players"`                    // cannot be empty
@@ -45,7 +45,7 @@ func findAvailableNameAndAddTeamToDb(info RegistrationInfo, db *dblib.DB) (strin
 			count := 1
 			// try default names until it works
 			for added {
-				id, err := db.CreateTeamIfNotExists(&types.Team{Tournament: *info.TournamentName, Name: "Team " + strconv.Itoa(count)})
+				id, err := db.CreateTeamIfNotExists(&types.Team{Tournament: *info.TournamentId, Name: "Team " + strconv.Itoa(count)})
 				if err != nil {
 					if err.Error() == "team already exists with given name" {
 						count++
@@ -74,7 +74,7 @@ func findAvailableNameAndAddTeamToDb(info RegistrationInfo, db *dblib.DB) (strin
 		}
 
 		// the name doesn't exist yet. Create the team
-		id, err := db.CreateTeamIfNotExists(&types.Team{Tournament: *info.TournamentName, Name: (*info.NamePreferences)[i]})
+		id, err := db.CreateTeamIfNotExists(&types.Team{Tournament: *info.TournamentId, Name: (*info.NamePreferences)[i]})
 		if err != nil {
 			if err.Error() == "team already exists with given name" {
 				// there was no update because another team registered at basically the same time and got the name first, try again
@@ -110,6 +110,11 @@ func findAvailableNameAndAddTeamToDb(info RegistrationInfo, db *dblib.DB) (strin
 		tx.Commit()
 	}
 	return teamName, nil
+}
+
+func addPlayerToDb(p types.Player, db *dblib.DB) error {
+	_, err := db.CreatePlayer(&p)
+	return err
 }
 
 func addTeamToSheets(info RegistrationInfo, spreadsheetId string, teamName string) error {
@@ -156,10 +161,42 @@ func addTeamToSheets(info RegistrationInfo, spreadsheetId string, teamName strin
 	return nil
 }
 
+func addIndividualToSheets(p types.Player, spreadsheetId string) error {
+	sheetName := "Individuals"
+	playerInfo := []interface{}{p.FirstName, p.LastName, p.Email, p.Club}
+	err := gtools.AddSheetRow(sheetName, spreadsheetId, playerInfo)
+	if err != nil {
+		if err.Error() == "sheet with name not found" {
+			// if the sheet doesn't exist, if it doesn't create it. Get the correct error
+			var values [][]interface{}
+			headers := []interface{}{"First Name", "Last Name", "Email", "Club"}
+			values = append(values, headers)
+			values = append(values, playerInfo)
+			err := gtools.AddSheet(spreadsheetId, sheetName)
+			if err != nil {
+				// check for api limit reached
+				return err
+			}
+			err = gtools.AddSheetData(sheetName, spreadsheetId, values)
+			if err != nil {
+				// check for api limit reached
+				return err
+			}
+			return nil
+		} else if err.Error() == "reached api limit" {
+			// Need to get the error for api limit reached
+			fmt.Println("the error for api limit")
+		}
+		return err
+	}
+	return nil
+}
+
 ////////////////////////////////
 /////// VALIDATE REQUEST ///////
 ////////////////////////////////
 
+// Could put these validations in the types
 func validatePerson(p types.Person) error {
 	if p.FirstName == nil {
 		msg := fmt.Sprintf("first_name required")
@@ -205,15 +242,15 @@ func validateCaptain(c types.Captain) error {
 }
 
 func nuwcRegistrationValidationIndividual(info RegistrationInfo, db *dblib.DB) error {
-	if info.TournamentName == nil {
-		msg := fmt.Sprintf("tournament_name required")
+	if info.TournamentId == nil {
+		msg := fmt.Sprintf("tournament_id required")
 		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
 	}
 
-	if exists, err := db.IsValidTournament(*info.TournamentName); err != nil {
+	if exists, err := db.IsValidTournament(*info.TournamentId); err != nil {
 		return err
 	} else if !exists {
-		msg := fmt.Sprintf("invalid tournament_name")
+		msg := fmt.Sprintf("invalid tournament_id")
 		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
 	}
 
@@ -234,6 +271,13 @@ func nuwcRegistrationValidationIndividual(info RegistrationInfo, db *dblib.DB) e
 		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
 	}
 
+	err := validatePlayer((*info.Players)[0])
+	if err != nil {
+		return err
+	}
+
+	// Maybe add validation for phone number??? Up to games
+
 	if info.NamePreferences != nil {
 		if len(*info.NamePreferences) > 1 {
 			msg := fmt.Sprintf("length of name_preferences > 1")
@@ -241,7 +285,7 @@ func nuwcRegistrationValidationIndividual(info RegistrationInfo, db *dblib.DB) e
 		}
 	}
 
-	if tournament, err := db.GetTournament(*info.TournamentName); err != nil {
+	if tournament, err := db.GetTournament(*info.TournamentId); err != nil {
 		return err
 	} else {
 		now := time.Now()
@@ -255,15 +299,15 @@ func nuwcRegistrationValidationIndividual(info RegistrationInfo, db *dblib.DB) e
 }
 
 func nuwcRegistrationValidationTeam(info RegistrationInfo, db *dblib.DB) error {
-	if info.TournamentName == nil {
-		msg := fmt.Sprintf("tournament_name required")
+	if info.TournamentId == nil {
+		msg := fmt.Sprintf("tournament_id required")
 		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
 	}
 
-	if exists, err := db.IsValidTournament(*info.TournamentName); err != nil {
+	if exists, err := db.IsValidTournament(*info.TournamentId); err != nil {
 		return err
 	} else if !exists {
-		msg := fmt.Sprintf("invalid tournament_name")
+		msg := fmt.Sprintf("invalid tournament_id")
 		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
 	}
 
@@ -311,10 +355,12 @@ func nuwcRegistrationValidationTeam(info RegistrationInfo, db *dblib.DB) error {
 		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
 	}
 
-	if tournament, err := db.GetTournament(*info.TournamentName); err != nil {
+	if tournament, err := db.GetTournament(*info.TournamentId); err != nil {
 		return err
 	} else {
 		now := time.Now()
+		// loc, _ := time.LoadLocation("Asia/Shanghai")
+		// now := time.Now().In(loc)
 		if now.Before(tournament.RegistrationTime) {
 			msg := fmt.Sprintf("registration is not open for this tournament")
 			return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
@@ -344,53 +390,73 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request, db *dblib.DB) error
 		return err
 	}
 
-	///////////////////////////////////////////////////
-	///////////// VALIDATE REQUEST FORMAT /////////////
-	///////////////////////////////////////////////////
-
-	if info.RegistrationType == nil {
-		msg := fmt.Sprintf("registration_type required")
-		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
-	}
-
-	err = nuwcRegistrationValidationTeam(info, db)
-	if err != nil {
-		return err
-	}
-
-	////////////////////////////////////////////////////
-	//////////////////// DB UPDATES ////////////////////
-	////////////////////////////////////////////////////
-
-	// might want to create a different function that tries to add team if
-	// the name doesn't exist and just tells the client that it failed if
-	// none of the names were available
-
-	teamName, err := findAvailableNameAndAddTeamToDb(info, db)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return err
-	}
-
-	///////////////////////////////////////////////////
-	////////////////// GOOGLE SHEETS //////////////////
-	///////////////////////////////////////////////////
-
 	// Try to keep API calls AS LOW AS POSSIBLE. We only get 500 per hour
 	// Right now it takes 2 API calls to create a team, and 1 to add an individual
 
 	// TODO:: Account for reaching API limit -- add cron (?) or a queue to add to
 	//        sheet once we have waited an hour. Could check on error
 
-	// Create new sheet for team
-	// We can either alter the sheetName to have the tournament_name too
-	// or we can use a different spreadsheetId for the two tournaments
-	// For now assuming two different sheets
+	if info.RegistrationType == nil {
+		msg := fmt.Sprintf("registration_type required")
+		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
+	}
 
-	err = addTeamToSheets(info, spreadsheetId, teamName)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return err
+	if *info.RegistrationType == "individual" {
+		//// INDIVIDUAL REGISTRATION ////
+
+		//// VALIDATE REQUEST ////
+		err = nuwcRegistrationValidationIndividual(info, db)
+		if err != nil {
+			return err
+		}
+
+		//// DB ////
+		err = addPlayerToDb((*info.Players)[0], db)
+		if err != nil {
+			return err
+		}
+
+		//// SHEETS ////
+		err = addIndividualToSheets((*info.Players)[0], spreadsheetId)
+		if err != nil {
+			return err
+		}
+
+	} else if *info.RegistrationType == "team" {
+		//// TEAM REGISTRATION ////
+
+		//// VALIDATE REQUEST ////
+		err = nuwcRegistrationValidationTeam(info, db)
+		if err != nil {
+			return err
+		}
+
+		//// DB ////
+		// might want to create a different function that tries to add team if
+		// the name doesn't exist and just tells the client that it failed if
+		// none of the names were available
+
+		// Need to add countries to the db so we can check against them
+
+		teamName, err := findAvailableNameAndAddTeamToDb(info, db)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return err
+		}
+
+		//// SHEETS ////
+		// We can either alter the sheetName to have the tournament_name too
+		// or we can use a different spreadsheetId for the two tournaments
+		// For now assuming two different sheets
+
+		err = addTeamToSheets(info, spreadsheetId, teamName)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return err
+		}
+	} else {
+		msg := fmt.Sprintf("registration_type must be individual or team")
+		return &lib.MalformedRequest{Status: http.StatusBadRequest, Msg: msg}
 	}
 
 	////////////////////////////////////////////////////
@@ -398,10 +464,21 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request, db *dblib.DB) error
 	////////////////////////////////////////////////////
 
 	// Notify the slack channel that the team registered
+	// just a post rqeuest to slack with the team name
+
+	// Helpful Links
+	// https://slack.com/help/articles/115005265063-Incoming-Webhooks-for-Slack
 
 	////////////////////////////////////////////////////
 	/////////////// EMAIL TO THE CAPTAIN ///////////////
 	////////////////////////////////////////////////////
+
+	// Can only send 100 emails on the google smtp server
+
+	// Helpful links
+	// https://www.digitalocean.com/community/tutorials/how-to-use-google-s-smtp-server
+	// https://www.calhoun.io/intro-to-templates-p1-contextual-encoding/
+	// https://blog.mailtrap.io/golang-send-email/
 
 	// Email the captain that we received their application to register
 	// with all the info they submitted

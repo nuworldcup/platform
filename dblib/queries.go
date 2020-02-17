@@ -20,12 +20,12 @@ func (db *DB) TeamExists(teamName string) (bool, error) {
 }
 
 // Checks if a tournament with a certain tournament_name exists
-func (db *DB) IsValidTournament(tournamentName string) (bool, error) {
-	if tournamentName == "" {
-		return false, errors.New("tournamentName must not be empty")
+func (db *DB) IsValidTournament(tournamentId string) (bool, error) {
+	if tournamentId == "" {
+		return false, errors.New("tournamentId must not be empty")
 	}
 	var exists bool
-	err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM tournament WHERE tournament_name=$1)`, tournamentName).Scan(&exists)
+	err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM tournament WHERE tournament_id=$1)`, tournamentId).Scan(&exists)
 	if err != nil {
 		return false, err
 	}
@@ -34,14 +34,14 @@ func (db *DB) IsValidTournament(tournamentName string) (bool, error) {
 
 // This could probably be used in place of the query above (might be faster) then just check for the noRow err
 // Gets one tournament given a tournament_name
-func (db *DB) GetTournament(tournamentName string) (*types.Tournament, error) {
-	if tournamentName == "" {
-		return nil, errors.New("tournamentName must not be empty")
+func (db *DB) GetTournament(tournamentId string) (*types.Tournament, error) {
+	if tournamentId == "" {
+		return nil, errors.New("tournamentId must not be empty")
 	}
 
 	var t types.Tournament
 
-	err := db.QueryRow(`SELECT tournament_name, display_name, tournament_timestamp, registration_timestamp FROM tournament WHERE tournament_name=$1`, tournamentName).Scan(&t.TournamentName, &t.DisplayName, &t.TournamentTime, &t.RegistrationTime)
+	err := db.QueryRow(`SELECT tournament_id, tournament_name, tournament_timestamp, registration_timestamp FROM tournament WHERE tournament_id=$1`, tournamentId).Scan(&t.TournamentId, &t.TournamentName, &t.TournamentTime, &t.RegistrationTime)
 	if err != nil {
 		return nil, err
 	}

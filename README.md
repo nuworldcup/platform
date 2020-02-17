@@ -41,9 +41,9 @@ In order for someone to use most of the endpoint, it assumes that there is a tou
 TODO:: Endpoint that creates tournaments so admins can create this from a web or mobile app
 
 ```
-INSERT INTO tournament(tournament_name, display_name, tournament_timestamp, registration_timestamp) VALUES('coed2020', '2020 Northwestern World Cup', 'May 22 09:00:00 2020 CST', 'February 9 13:00:00 2020 CST');
+INSERT INTO tournament(tournament_id, tournament_name, tournament_timestamp, registration_timestamp) VALUES('coed2020', '2020 Northwestern World Cup', 'May 22 09:00:00 2020 CST', 'February 9 13:00:00 2020 CST');
 
-INSERT INTO tournament(tournament_name, display_name, tournament_timestamp, registration_timestamp) VALUES('womens2020', '2020 Women''s NU World Cup', 'May 22 09:00:00 2020 CST', 'March 9 13:00:00 2020 CST');
+INSERT INTO tournament(tournament_id, tournament_name, tournament_timestamp, registration_timestamp) VALUES('womens2020', '2020 Women''s NU World Cup', 'May 22 09:00:00 2020 CST', 'March 9 13:00:00 2020 CST');
 ```
 
 #### Google Sheets setup

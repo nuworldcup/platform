@@ -89,8 +89,8 @@ type Game struct {
 }
 
 type Tournament struct {
+	TournamentId     string    `json:"tournament_id"`
 	TournamentName   string    `json:"tournament_name"`
-	DisplayName      string    `json:"display_name"`
 	TournamentTime   time.Time `json:"tournament_timestamp"`
 	RegistrationTime time.Time `json:"registration_timestamp"`
 }

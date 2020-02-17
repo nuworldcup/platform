@@ -23,10 +23,10 @@ func (db *DB) CreateTeamIfNotExists(t *types.Team) (int, error) {
 		return teamId, errors.New("team_name must not be empty")
 	}
 	if t.Tournament == "" {
-		return teamId, errors.New("tournament_name must not be empty")
+		return teamId, errors.New("tournament_id must not be empty")
 	}
 	// upsert
-	err := db.QueryRow(`INSERT INTO team(team_name, fk_tournament_name) VALUES($1, $2) ON CONFLICT (team_name, fk_tournament_name) DO NOTHING RETURNING (team_id)`, t.Name, t.Tournament).Scan(&teamId)
+	err := db.QueryRow(`INSERT INTO team(team_name, fk_tournament_id) VALUES($1, $2) ON CONFLICT (team_name, fk_tournament_id) DO NOTHING RETURNING (team_id)`, t.Name, t.Tournament).Scan(&teamId)
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			return 0, errors.New("team already exists with given name")
@@ -34,6 +34,16 @@ func (db *DB) CreateTeamIfNotExists(t *types.Team) (int, error) {
 		return teamId, err
 	}
 	return teamId, nil
+}
+
+// Creates a new player
+// Returns an error if team is invalid or the tx fails
+func (db *DB) CreatePlayer(p *types.Player) (sql.Result, error) {
+	if p == nil {
+		return nil, errors.New("player required")
+	}
+	res, err := db.Exec(`INSERT INTO player(first_name, last_name, email, club) VALUES($1, $2, $3, $4)`, p.FirstName, p.LastName, p.Email, p.Club)
+	return res, err
 }
 
 ////////////////////////////////////////////////////
