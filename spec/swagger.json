@@ -4,16 +4,16 @@
     "title" : "Northwestern World Cup platform API",
     "description" : "API for the Northwestern World Cup Platform",
     "contact" : {
-      "email" : "rojaswestall@gmail.com"
+      "email" : "rojaswestall@u.northwestern.edu"
     },
     "license" : {
       "name" : "Apache 2.0",
       "url" : "http://www.apache.org/licenses/LICENSE-2.0.html"
     },
-    "version" : "1.0.3"
+    "version" : "1.0.5"
   },
   "servers" : [ {
-    "url" : "https://virtserver.swaggerhub.com/nuworldcup/platform/1.0.3",
+    "url" : "https://virtserver.swaggerhub.com/nuworldcup/platform/1.0.5",
     "description" : "SwaggerHub API Auto Mocking"
   } ],
   "tags" : [ {
@@ -21,14 +21,14 @@
     "description" : "Operations available to regular developers"
   } ],
   "paths" : {
-    "/registrationOpen/{tournament_type}" : {
+    "/registrationOpen/{tournament_id}" : {
       "get" : {
         "tags" : [ "developers" ],
         "summary" : "checks if registration is open",
-        "description" : "Given a specific `tournament_type`, returns whether registration is open or not. `tournament_type` can be one of `['coed2020', 'womens2020']`.",
+        "description" : "Given a specific `tournament_id`, returns whether registration is open or not. `tournament_id` can be one of `['coed2020', 'womens2020']`.",
         "operationId" : "registrationOpen",
         "parameters" : [ {
-          "name" : "tournament_type",
+          "name" : "tournament_id",
           "in" : "path",
           "description" : "type of tournament to look up",
           "required" : true,
@@ -55,11 +55,48 @@
         }
       }
     },
+    "/availableCountries/{tournament_id}" : {
+      "get" : {
+        "tags" : [ "developers" ],
+        "summary" : "gets available country names",
+        "description" : "Given a specific `tournament_id`, returns the list of countries that teams can sign up as. `tournament_id` can be one of `['coed2020', 'womens2020']`.",
+        "operationId" : "availableCountries",
+        "parameters" : [ {
+          "name" : "tournament_id",
+          "in" : "path",
+          "description" : "type of tournament to look up",
+          "required" : true,
+          "style" : "simple",
+          "explode" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "the request was succesful and a list of available countries is in the body of the response",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/CountryAvailable"
+                  }
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "bad input parameter"
+          }
+        }
+      }
+    },
     "/register" : {
       "post" : {
         "tags" : [ "developers" ],
         "summary" : "registers user(s) for a tournament",
-        "description" : "Adds all players and captains to the db and google sheets. If `registration_type` is `team`, platform will create an entire team in the db and on google sheets. For `team` registration, the system will try to create a new sheet in order of the the `name_preferences` and if all are taken by other teams will assign a default. For `individual` registration, simply omit the `name_preferences` and `captains` fields, and include a `players` array of just one player.",
+        "description" : "Adds all players and captains to the db and google sheets. If `registration_type` is `team`, platform will create an entire team in the db and on google sheets. For `team` registration, the system will try to create a new sheet in order of the the `name_preferences` and if all are taken by other teams will assign a default. For `individual` registration, simply omit the `name_preferences` and `captains` fields, and include a `players` array of just one player. If registering using countries, pass the `country` field from `CountryAvailable` as values in `name_preferences`.",
         "operationId" : "register",
         "requestBody" : {
           "description" : "Inventory item to add",
@@ -138,17 +175,42 @@
           }
         }
       },
-      "RegistrationInfo" : {
-        "required" : [ "captains", "name_preferences", "players", "registration_type", "tournament_type" ],
+      "CountryAvailable" : {
         "type" : "object",
         "properties" : {
+          "country" : {
+            "type" : "string",
+            "example" : "brazil"
+          },
+          "display_name" : {
+            "type" : "string",
+            "example" : "Brazil"
+          },
+          "two_letter_iso" : {
+            "type" : "string",
+            "example" : "br"
+          },
+          "three_letter_iso" : {
+            "type" : "string",
+            "example" : "bra"
+          },
+          "available" : {
+            "type" : "boolean",
+            "example" : true
+          }
+        }
+      },
+      "RegistrationInfo" : {
+        "required" : [ "captains", "name_preferences", "players", "registration_type", "tournament_id" ],
+        "type" : "object",
+        "properties" : {
+          "tournament_id" : {
+            "type" : "string",
+            "enum" : [ "coed2020", "womens2020" ]
+          },
           "registration_type" : {
             "type" : "string",
             "enum" : [ "team", "individual" ]
-          },
-          "tournament_type" : {
-            "type" : "string",
-            "enum" : [ "coed2020", "womens2020" ]
           },
           "name_preferences" : {
             "type" : "array",
@@ -167,6 +229,21 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/Player"
+            }
+          }
+        }
+      }
+    },
+    "responses" : {
+      "AvailableCountries" : {
+        "description" : "the request was succesful and a list of available countries is in the body of the response",
+        "content" : {
+          "application/json" : {
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/components/schemas/CountryAvailable"
+              }
             }
           }
         }
