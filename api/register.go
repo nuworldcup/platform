@@ -45,13 +45,21 @@ func findAvailableNameAndAddTeamToDb(info RegistrationInfo, db *dblib.DB) (strin
 			count := 1
 			// try default names until it works
 			for added {
-				id, err := db.CreateTeamIfNotExists(&types.Team{Tournament: *info.TournamentId, Name: "Team " + strconv.Itoa(count)})
+				tx, _ := db.Begin()
+				id, err := tx.CreateTeam(*info.TournamentId, &types.Team{Name: "Team " + strconv.Itoa(count)})
 				if err != nil {
-					if err.Error() == "team already exists with given name" {
+					return "", err
+				}
+				_, err = tx.AssignTeamToTournament(id, "Team "+strconv.Itoa(count), *info.TournamentId)
+				if err != nil {
+					if err.Error() == "pq: duplicate key value violates unique constraint \"team_tournament_team_tournament_name_key\"" {
 						count++
 						continue
 					}
-					// insert failed: something wrong with the db, tell the client we're messed UP
+					return "", err
+				}
+				err = tx.Commit()
+				if err != nil {
 					return "", err
 				}
 
@@ -74,13 +82,18 @@ func findAvailableNameAndAddTeamToDb(info RegistrationInfo, db *dblib.DB) (strin
 		}
 
 		// the name doesn't exist yet. Create the team
-		id, err := db.CreateTeamIfNotExists(&types.Team{Tournament: *info.TournamentId, Name: (*info.NamePreferences)[i]})
+		tx, _ := db.Begin()
+		id, err := tx.CreateTeam(*info.TournamentId, &types.Team{Name: (*info.NamePreferences)[i]})
 		if err != nil {
-			if err.Error() == "team already exists with given name" {
-				// there was no update because another team registered at basically the same time and got the name first, try again
-				continue
-			}
-			// insert failed: something wrong with the db, tell the client we're messed UP
+			return "", err
+		}
+		_, err = tx.AssignTeamToTournament(id, (*info.NamePreferences)[i], *info.TournamentId)
+		if err != nil {
+			// something went wrong assigning the team to the tournament
+			return "", err
+		}
+		err = tx.Commit()
+		if err != nil {
 			return "", err
 		}
 		teamId = id
@@ -96,7 +109,11 @@ func findAvailableNameAndAddTeamToDb(info RegistrationInfo, db *dblib.DB) (strin
 			// something went wrong creating the player
 			return "", err
 		}
-		tx.AssignPlayerToTeam(teamId, playerId)
+		_, err = tx.AssignPlayerToTeam(teamId, playerId)
+		if err != nil {
+			// something went wrong assigning the player to a team
+			return "", err
+		}
 		tx.Commit()
 	}
 	for i := 0; i < len(*info.Captains); i++ {
@@ -106,7 +123,11 @@ func findAvailableNameAndAddTeamToDb(info RegistrationInfo, db *dblib.DB) (strin
 			// something went wrong creating the player
 			return "", err
 		}
-		tx.AssignCaptainToTeam(teamId, playerId)
+		_, err = tx.AssignCaptainToTeam(teamId, playerId)
+		if err != nil {
+			// something went wrong assigning the captain to a team
+			return "", err
+		}
 		tx.Commit()
 	}
 	return teamName, nil

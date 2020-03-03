@@ -20,23 +20,23 @@ CREATE TABLE IF NOT EXISTS tournament(
 
 CREATE TABLE IF NOT EXISTS team(
    team_id serial UNIQUE PRIMARY KEY,
-   team_name VARCHAR (50) NOT NULL DEFAULT '',
+   team_name VARCHAR (50) NOT NULL DEFAULT '', -- can be changed at anytime
    icon VARCHAR (50) NOT NULL DEFAULT ''
 );
 
 -- This would mean we don't need the fk_tournament_id in team anymore
 CREATE TABLE IF NOT EXISTS team_tournament(
    team_id int REFERENCES team (team_id) ON UPDATE CASCADE ON DELETE CASCADE,
-   tournament_id int REFERENCES tournament (tournament_id) ON UPDATE CASCADE ON DELETE CASCADE,
+   tournament_id VARCHAR (50) REFERENCES tournament (tournament_id) ON UPDATE CASCADE ON DELETE CASCADE,
+   team_tournament_name VARCHAR (50) UNIQUE NOT NULL DEFAULT '',
    -- keep track of wins, losses and draws in a tournament
    wins int NOT NULL DEFAULT 0,
    losses int NOT NULL DEFAULT 0,
    draws int NOT NULL DEFAULT 0,
    CONSTRAINT team_tournament_key PRIMARY KEY (team_id, tournament_id) -- explicit pk
-)
+);
 
--- this is probably not needed
-CREATE UNIQUE INDEX idx_team_name_tournament ON team(team_name, fk_tournament_id);
+-- CREATE UNIQUE INDEX idx_team_tournament ON team(team_name, fk_tournament_id);
 
 -- so a player can be on multiple teams
 -- this table keeps track of which players are on which teams
@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS tournament_group_team(
 -- just create games who's home and away point to winners of other games, no need for this
 CREATE TABLE IF NOT EXISTS knockout_round(
    -- can have multiple games in a knockout round with a junction table
-   soccer_game_id int REFERENCES soccer_game (soccer_game_id) ON UPDATE CASCADE ON DELETE CASCADE,
+   soccer_game_id int REFERENCES soccer_game (soccer_game_id) ON UPDATE CASCADE ON DELETE CASCADE
    -- need some way to reference the result of something
    -- could reference the
 );

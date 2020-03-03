@@ -29,15 +29,14 @@ type Admin struct {
 }
 
 type Team struct {
-	Id         string   `json:"id"`
-	Captains   []Player `json:"captains"`
-	Players    []Player `json:"players"` // have this be a list of ids
-	Name       string   `json:"name"`
-	Wins       int      `json:"wins"`
-	Losses     int      `json:"losses"`
-	Draws      int      `json:"draws:"`
-	Icon       string   `json:"icon"` // url of icon or flag to represent team
-	Tournament string   `json:"tournament_name"`
+	Id       string   `json:"id"`
+	Captains []Player `json:"captains"`
+	Players  []Player `json:"players"` // have this be a list of ids
+	Name     string   `json:"name"`
+	Wins     int      `json:"wins"`
+	Losses   int      `json:"losses"`
+	Draws    int      `json:"draws"`
+	Icon     string   `json:"icon"` // url of icon or flag to represent team
 }
 
 // there is some way to get this from the db and this will not be needed

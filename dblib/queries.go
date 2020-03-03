@@ -48,3 +48,37 @@ func (db *DB) GetTournament(tournamentId string) (*types.Tournament, error) {
 
 	return &t, nil
 }
+
+func (db *DB) GetCountries(tournamentId string) ([]types.Country, error) {
+	// join the tournament
+	if tournamentId == "" {
+		return nil, errors.New("tournamentId must not be empty")
+	}
+
+	countries := []types.Country{}
+
+	// still need to only get the teams for a specific tournament
+	rows, err := db.Query(`SELECT c.country_pkey, display_name, two_letter_iso, three_letter_iso FROM country c LEFT JOIN team t ON t.team_name = c.country_pkey WHERE t.team_name IS NULL`)
+	if err != nil {
+		return nil, err
+	}
+
+	// Iterate through results of query and store them in countries
+	defer rows.Close()
+	for rows.Next() {
+		var c types.Country
+		err = rows.Scan(&c.CountryKey, &c.DisplayName, &c.TwoLetterIso, &c.ThreeLetterIso)
+		if err != nil {
+			return nil, err
+		}
+		countries = append(countries, c)
+	}
+
+	// get any error encountered during iteration
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	return countries, nil
+}

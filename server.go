@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -112,6 +113,30 @@ func (nuwc *NUWCData) registrationOpenHandler(w http.ResponseWriter, r *http.Req
 	}
 }
 
+func (nuwc *NUWCData) availableCountriesHandler(w http.ResponseWriter, r *http.Request) {
+	tournamentName := mux.Vars(r)["tournament_name"]
+	availableCountries, err := api.AvailableCountriesHandler(nuwc.db, tournamentName)
+	if err != nil {
+		// can probably make this a function to use in all handlers
+		var mr *lib.MalformedRequest
+		if errors.As(err, &mr) {
+			http.Error(w, mr.Msg, mr.Status)
+		} else {
+			log.Println(err.Error())
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
+	} else {
+		res, err := json.Marshal(availableCountries)
+		if err != nil {
+			log.Println(err.Error())
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
+		// TODO:: return happy response
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(res)
+	}
+}
+
 func main() {
 	// create db instance
 	// TODO:: Use AWS secrets to get username and password
@@ -140,9 +165,10 @@ func main() {
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/", homeLink)
 	router.HandleFunc("/serveWs", serveWs)
-	router.HandleFunc("/registrationOpen/{tournament_name}", nuwc.registrationOpenHandler)
 	router.HandleFunc("/register", nuwc.registerHandler).Methods("POST")
-	//add any new endpoints here
+	router.HandleFunc("/registrationOpen/{tournament_name}", nuwc.registrationOpenHandler)
+	// This is specific to tournaments that are using countries for names
+	router.HandleFunc("/availableCountries/{tournament_name}", nuwc.availableCountriesHandler)
 
 	// Start listening
 	fmt.Println("The server is listening at http://localhost:8080")

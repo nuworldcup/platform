@@ -62,7 +62,13 @@ go run server.go
 
 If you're adding a table, index, adding a column or whatever it is, add another migration file. Make sure you put the sequential number in front of it, and add both a migrate up and migrate down. If you need help understanding migrations, it might be a good idea to look at the [golang-migrate docs](https://github.com/golang-migrate/migrate).
 
-You can use the [golang-migrate CLI](https://github.com/golang-migrate/migrate/tree/master/cmd/migrate) to help you. Basically if you make a mistake, you can [force a version](https://github.com/golang-migrate/migrate/issues/282#issuecomment-530732246). Or if you just want to see what a prior version of the db is like you can migrate up or down accordingly. To install the golang-migrate CLI on mac:
+You can use the [golang-migrate CLI](https://github.com/golang-migrate/migrate/tree/master/cmd/migrate) to help you. Basically if you make a mistake, you can [force a version](https://github.com/golang-migrate/migrate/issues/282#issuecomment-530732246):
+
+```
+migrate -path migrate/migrations -database postgres://nuwcuser:password@localhost:5432/nuwc?sslmode=disable force 1
+```
+
+Or if you just want to see what a prior version of the db is like you can migrate up or down accordingly. To install the golang-migrate CLI on mac:
 
 ```
 brew install golang-migrate
